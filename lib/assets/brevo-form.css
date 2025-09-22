@@ -1,0 +1,185 @@
+/* Brevo Form Styles - Elementor Compatible */
+.brevo-form-container {
+    max-width: 500px;
+    margin: 0 auto;
+    border-radius: 12px;
+    font-family: inherit;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form input[type="email"],
+.brevo-form-container form.brevo-form input[type="tel"],
+.brevo-form-container form.brevo-form input[type="text"] {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    background-color: #ffffff;
+    color: #333333;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form input[type="email"]:focus,
+.brevo-form-container form.brevo-form input[type="tel"]:focus,
+.brevo-form-container form.brevo-form input[type="text"]:focus {
+    outline: none;
+    border-color: #0073aa;
+    box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.1);
+    position: relative;
+    z-index: 2;
+}
+
+.brevo-form-container form.brevo-form input[readonly] {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.brevo-form-container form.brevo-form .whatsapp-group {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form .whatsapp-group .country-code-input {
+    width: 100px;
+    flex-shrink: 0;
+    text-align: center;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.brevo-form-container form.brevo-form .whatsapp-group .country-code-input:focus {
+    background-color: #ffffff;
+    border-color: #0073aa;
+    box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.1);
+}
+
+.brevo-form-container form.brevo-form .whatsapp-group input[type="tel"] {
+    flex: 1;
+}
+
+.brevo-form-container form.brevo-form button[type="submit"] {
+    background: var(--corporative-color, #0073aa);
+    color: white;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    width: auto;
+    display: inline-block;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form button[type="submit"]:hover {
+    background: var(--corporative-color, #0073aa);
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+.brevo-form-container form.brevo-form button[type="submit"]:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 1;
+}
+
+.brevo-form-container form.brevo-form .success-message {
+    color: #28a745;
+    text-align: center;
+    padding: 30px 20px;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form .success-message h3 {
+    color: #155724;
+    margin-bottom: 10px;
+}
+
+.brevo-form-container form.brevo-form .success-message p {
+    color: #155724;
+    margin: 0;
+}
+
+/* Elementor Popup Specific Styles */
+.elementor-popup-modal .brevo-form-container {
+    z-index: 999999;
+}
+
+.elementor-popup-modal .brevo-form-container form.brevo-form {
+    z-index: 999999;
+}
+
+.elementor-popup-modal .brevo-form-container form.brevo-form input,
+.elementor-popup-modal .brevo-form-container form.brevo-form button {
+    z-index: 999999;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .brevo-form-container {
+        margin: 20px;
+    }
+    
+    .brevo-form-container form.brevo-form .whatsapp-group {
+        flex-direction: row;
+        gap: 8px;
+    }
+    
+    .brevo-form-container form.brevo-form .whatsapp-group .country-code-input {
+        width: 80px;
+        min-width: 80px;
+        flex-shrink: 0;
+        font-size: 14px;
+        padding: 12px 8px;
+    }
+    
+    .brevo-form-container form.brevo-form .whatsapp-group input[type="tel"] {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .brevo-form-container form.brevo-form button[type="submit"] {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* Prevent conflicts with other plugins */
+.brevo-form-container * {
+    box-sizing: border-box;
+}
+
+/* Ensure form doesn't interfere with Elementor's modal system */
+.elementor-popup-modal .brevo-form-container {
+    position: static;
+}
+
+.elementor-popup-modal .brevo-form-container form.brevo-form {
+    position: static;
+} 
