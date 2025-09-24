@@ -130,7 +130,7 @@ function metahotels_brevo_settings_page() {
                                value="<?php echo esc_attr($default_country); ?>" 
                                class="regular-text"
                                required />
-                        <p class="description">Enter the default country code (e.g., +1 for USA, +91 for India) for phone numbers in subscription forms. If detection fails, users will see just a "+" sign and can manually enter their country code.</p>
+                        <p class="description">Enter the default country code (e.g., +1 for USA, +91 for India) for phone numbers in subscription forms. Users can manually change this code if needed.</p>
                     </td>
                 </tr>
                 <tr>
@@ -243,11 +243,6 @@ function metahotels_brevo_settings_page() {
         <h2>Debug Information</h2>
         <p><strong>API Key Status:</strong> <?php echo !empty($api_key) ? 'Configured' : 'Not configured'; ?></p>
         <p><strong>Lists Found:</strong> <?php echo count($lists); ?></p>
-        <p><strong>Country Detection Test:</strong> <?php echo metahotels_get_country_from_ip(); ?></p>
-        
-        <h3>Country Detection Test</h3>
-        <p>Current detected country code: <strong><?php echo metahotels_get_country_from_ip(); ?></strong></p>
-        <p>Your IP address: <strong><?php echo $_SERVER['REMOTE_ADDR'] ?? 'Unknown'; ?></strong></p>
         
         <h3>AJAX Test</h3>
         <p>Click the button below to test if AJAX is working:</p>
@@ -456,51 +451,6 @@ function metahotels_brevo_update_contact($api_key, $email, $contact_data) {
     }
 }
 
-// Get country from IP using ipwho.is service
-function metahotels_get_country_from_ip() {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    
-    // Get real IP from various headers if needed
-    if (empty($ip)) {
-        $ip_headers = array('HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_X_CLUSTER_CLIENT_IP', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED');
-        foreach ($ip_headers as $header) {
-            if (!empty($_SERVER[$header])) {
-                $ip = $_SERVER[$header];
-                break;
-            }
-        }
-    }
-    
-    // If no IP found, return default
-    if (empty($ip)) {
-        error_log('Brevo Country Detection: No IP found, returning default');
-        return get_option('metahotels_brevo_default_country', 'IN');
-    }
-    
-    error_log('Brevo Country Detection: Detected IP: ' . $ip);
-    
-    // Use ipwho.is as the single reliable service
-    $response = wp_remote_get("https://ipwho.is/{$ip}", array(
-        'timeout' => 5
-    ));
-    
-    if (!is_wp_error($response)) {
-        $data = json_decode(wp_remote_retrieve_body($response), true);
-        if ($data && isset($data['success']) && $data['success'] === true && isset($data['calling_code'])) {
-            $calling_code = $data['calling_code'];
-            $country_code = $data['country_code'] ?? '';
-            error_log('Brevo Country Detection: ipwho.is detected: ' . $country_code . ' with calling code: ' . $calling_code);
-            
-            // Return the calling code directly since ipwho.is provides it
-            $phone_code = '+' . $calling_code;
-            error_log('Brevo Country Detection: Final result: ' . $phone_code . ' (from ' . $country_code . ')');
-            return $phone_code;
-        }
-    }
-    
-    error_log('Brevo Country Detection: Service failed, returning default');
-    return get_option('metahotels_brevo_default_country', 'IN');
-} 
 
 // Validate WhatsApp number
 function metahotels_validate_whatsapp_number($phone_number, $country_code) {

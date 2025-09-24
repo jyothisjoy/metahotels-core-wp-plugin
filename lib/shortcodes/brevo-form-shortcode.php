@@ -38,8 +38,8 @@ function metahotels_brevo_form_shortcode($atts) {
             return '<p style="color: red;">Error: List ID is required for Brevo form.</p>';
         }
         
-        // Get country code for WhatsApp
-        $country_code = metahotels_get_country_from_ip();
+        // Country code field will be empty by default - user must enter it
+        $country_code = '';
         
         // Get redirect URL from shortcode attributes only
         $redirect_url = !empty($atts['redirect_url']) ? $atts['redirect_url'] : '';
@@ -103,7 +103,7 @@ function metahotels_brevo_form_shortcode($atts) {
         // WhatsApp field
         $output .= '<div>';
         $output .= '<div class="whatsapp-group">';
-        $output .= '<input type="text" name="country_code" id="country_code_' . $form_id . '" value="' . esc_attr($country_code) . '" placeholder="+" class="country-code-input">';
+        $output .= '<input type="text" name="country_code" id="country_code_' . $form_id . '" value="' . esc_attr($country_code) . '" placeholder="Code" class="country-code-input" maxlength="4" pattern="\+[0-9]{1,3}" required>';
         $output .= '<input type="tel" name="whatsapp" id="whatsapp_' . $form_id . '" placeholder="WhatsApp Number *" required>';
         $output .= '</div>';
         $output .= '</div>';
@@ -245,6 +245,35 @@ function metahotels_brevo_form_scripts() {
                 formsFound++;
                 newFormsFound++;
                 
+                // Auto-format country code field and restrict input
+                $form.find('input[name="country_code"]').on('input keypress', function(e) {
+                    var value = $(this).val();
+                    
+                    // Block any non-numeric characters except + at the beginning
+                    if (e.type === 'keypress') {
+                        var char = String.fromCharCode(e.which);
+                        // Allow + only at the beginning, numbers anywhere
+                        if (char === '+' && value.length === 0) {
+                            return true; // Allow + at the beginning
+                        } else if (/[0-9]/.test(char)) {
+                            return true; // Allow numbers
+                        } else {
+                            e.preventDefault(); // Block everything else
+                            return false;
+                        }
+                    }
+                    
+                    // Auto-format: If user types without +, add it automatically
+                    if (value && !value.startsWith('+') && /^\d/.test(value)) {
+                        $(this).val('+' + value);
+                    }
+                    
+                    // Enforce maximum length (4 characters: + and up to 3 digits)
+                    if (value.length > 4) {
+                        $(this).val(value.substring(0, 4));
+                    }
+                });
+                
                 $form.on('submit', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -277,7 +306,11 @@ function metahotels_brevo_form_scripts() {
                             } else {
                                 var errorMessage = "Something went wrong. Please try again.";
                                 if (response.data) {
-                                    if (response.data.includes("Brevo")) {
+                                    if (response.data.includes("Country code is required")) {
+                                        errorMessage = "Please enter your country code (e.g., +1, +91, +44).";
+                                    } else if (response.data.includes("Invalid country code format")) {
+                                        errorMessage = "Invalid country code format. Please enter a valid country code (e.g., +1, +91, +44).";
+                                    } else if (response.data.includes("Brevo")) {
                                         errorMessage = "Unable to save your information. Please try again later.";
                                     } else if (response.data.includes("Invalid email")) {
                                         errorMessage = "Please enter a valid email address.";
@@ -466,15 +499,30 @@ function metahotels_brevo_subscribe_handler() {
         );
         
         // Add WhatsApp (now required)
-        // Use the country code from the form, fallback to auto-detection if empty
+        // Validate country code - it's now required from user input
         if (empty($country_code)) {
-            $country_code = metahotels_get_country_from_ip();
+            $error_message = 'Country code is required. Please enter your country code (e.g., +1, +91, +44).';
+            if (wp_doing_ajax()) {
+                wp_send_json_error($error_message);
+            } else {
+                wp_die($error_message);
+            }
         }
         
         // Clean and format the country code
         $country_code = trim($country_code);
         if (!preg_match('/^\+\d+$/', $country_code)) {
             $country_code = '+' . ltrim($country_code, '+');
+        }
+        
+        // Validate country code format
+        if (!preg_match('/^\+\d{1,4}$/', $country_code)) {
+            $error_message = 'Invalid country code format. Please enter a valid country code (e.g., +1, +91, +44).';
+            if (wp_doing_ajax()) {
+                wp_send_json_error($error_message);
+            } else {
+                wp_die($error_message);
+            }
         }
         
         // Clean and format the phone number
