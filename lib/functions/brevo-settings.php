@@ -670,6 +670,87 @@ function metahotels_verify_csrf_token($token_data) {
     return $is_valid;
 } 
 
+// Delete user from Brevo by email
+function metahotels_delete_brevo_user($email) {
+    $api_key = get_option('metahotels_brevo_api_key');
+    if (empty($api_key)) {
+        error_log('Brevo User Deletion: API key not configured');
+        return false;
+    }
+    
+    // First, get the contact ID by email
+    $response = wp_remote_get("https://api.brevo.com/v3/contacts/{$email}", array(
+        'headers' => array(
+            'api-key' => $api_key,
+            'Content-Type' => 'application/json'
+        ),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        error_log('Brevo User Deletion: Failed to get contact - ' . $response->get_error_message());
+        return false;
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code === 404) {
+        error_log('Brevo User Deletion: Contact not found - ' . $email);
+        return true; // Contact doesn't exist, consider it deleted
+    }
+    
+    if ($response_code !== 200) {
+        error_log('Brevo User Deletion: Failed to get contact - HTTP ' . $response_code);
+        return false;
+    }
+    
+    // Delete the contact
+    $delete_response = wp_remote_request("https://api.brevo.com/v3/contacts/{$email}", array(
+        'method' => 'DELETE',
+        'headers' => array(
+            'api-key' => $api_key,
+            'Content-Type' => 'application/json'
+        ),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($delete_response)) {
+        error_log('Brevo User Deletion: Failed to delete contact - ' . $delete_response->get_error_message());
+        return false;
+    }
+    
+    $delete_code = wp_remote_retrieve_response_code($delete_response);
+    if ($delete_code === 204 || $delete_code === 200) {
+        error_log('Brevo User Deletion: Successfully deleted contact - ' . $email);
+        return true;
+    } else {
+        error_log('Brevo User Deletion: Failed to delete contact - HTTP ' . $delete_code);
+        return false;
+    }
+}
+
+// Handle booking page visits - delete user from Brevo
+function metahotels_handle_booking_page_visit() {
+    // Check if we're on the booking confirmation page
+    if (is_page('my-booking') || strpos($_SERVER['REQUEST_URI'], '/my-booking/') !== false) {
+        // Check if user has a Brevo session (from popup registration)
+        if (isset($_COOKIE['brevo_registered_email'])) {
+            $email = sanitize_email($_COOKIE['brevo_registered_email']);
+            
+            if (is_email($email)) {
+                // Delete user from Brevo
+                $deleted = metahotels_delete_brevo_user($email);
+                
+                if ($deleted) {
+                    // Clear the cookie
+                    setcookie('brevo_registered_email', '', time() - 3600, '/');
+                    error_log('Brevo User Deletion: User deleted from Brevo after booking - ' . $email);
+                }
+            }
+        }
+    }
+}
+add_action('wp', 'metahotels_handle_booking_page_visit');
+
 // Simple test function for debugging
 function metahotels_brevo_test_ajax() {
     if (isset($_POST['test_ajax']) && $_POST['test_ajax'] === 'test') {

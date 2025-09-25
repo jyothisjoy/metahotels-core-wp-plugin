@@ -561,6 +561,9 @@ function metahotels_brevo_subscribe_handler() {
                 $response_data['redirect_url'] = $redirect_url;
             }
             
+            // Set cookie to track user for potential deletion on booking page
+            setcookie('brevo_registered_email', $email, time() + (30 * 24 * 60 * 60), '/'); // 30 days
+            
             if (wp_doing_ajax()) {
                 wp_send_json_success($response_data);
             } else {
