@@ -1,101 +1,62 @@
 <?php
-if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly.
+/**
+ * Template for displaying single hotel posts
+ * 
+ * @package MetaHotels
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
 }
 
-get_header();
+get_header(); ?>
 
-// Get the current hotel post
-$hotel = get_post();
+<div id="primary" class="content-area">
+	<main id="main" class="site-main">
+		<?php
+		while ( have_posts() ) :
+			the_post();
+			?>
+			<article id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
+				<header class="entry-header">
+					<?php the_title( '<h1 class="entry-title">', '</h1>' ); ?>
+				</header>
 
-// Check if this is a subpage
-$is_subpage = !empty($wp_query->query_vars['page']);
+				<div class="entry-content">
+					<?php
+					the_content();
 
-if ($is_subpage) {
-    // This is a subpage (e.g., about-us)
-    $subpage_slug = $wp_query->query_vars['page'];
-    
-    // Get the subpage content
-    $subpage = get_page_by_path($subpage_slug, OBJECT, 'hotel');
-    
-    if ($subpage) {
-        // Display subpage content
-        ?>
-        <div id="primary" <?php astra_primary_class(); ?>>
-            <?php astra_primary_content_top(); ?>
-            
-            <article id="post-<?php echo $subpage->ID; ?>" <?php post_class(); ?>>
-                <header class="entry-header">
-                    <h1 class="entry-title"><?php echo $subpage->post_title; ?></h1>
-                </header>
+					wp_link_pages( array(
+						'before' => '<div class="page-links">' . esc_html__( 'Pages:', 'metahotels-core' ),
+						'after'  => '</div>',
+					) );
+					?>
+				</div>
 
-                <div class="entry-content">
-                    <?php echo apply_filters('the_content', $subpage->post_content); ?>
-                </div>
-            </article>
+				<?php
+				// Display hotel subpages if any
+				$subpages = get_pages( array(
+					'child_of' => get_the_ID(),
+					'post_type' => 'hotel',
+					'sort_column' => 'menu_order'
+				) );
 
-            <?php astra_primary_content_bottom(); ?>
-        </div>
-        <?php
-    } else {
-        // Subpage not found
-        ?>
-        <div id="primary" <?php astra_primary_class(); ?>>
-            <?php astra_primary_content_top(); ?>
-            
-            <article class="error-404 not-found">
-                <header class="page-header">
-                    <h1 class="page-title"><?php esc_html_e('Page Not Found', 'astra'); ?></h1>
-                </header>
+				if ( $subpages ) {
+					echo '<div class="hotel-subpages">';
+					echo '<h2>' . esc_html__( 'Hotel Pages', 'metahotels-core' ) . '</h2>';
+					echo '<ul>';
+					foreach ( $subpages as $subpage ) {
+						echo '<li><a href="' . esc_url( get_permalink( $subpage->ID ) ) . '">' . esc_html( $subpage->post_title ) . '</a></li>';
+					}
+					echo '</ul>';
+					echo '</div>';
+				}
+				?>
+			</article>
+			<?php
+		endwhile;
+		?>
+	</main>
+</div>
 
-                <div class="page-content">
-                    <p><?php esc_html_e('The requested page could not be found.', 'astra'); ?></p>
-                </div>
-            </article>
-
-            <?php astra_primary_content_bottom(); ?>
-        </div>
-        <?php
-    }
-} else {
-    // This is the main hotel page
-    ?>
-    <div id="primary" <?php astra_primary_class(); ?>>
-        <?php astra_primary_content_top(); ?>
-        
-        <article id="post-<?php echo $hotel->ID; ?>" <?php post_class(); ?>>
-            <header class="entry-header">
-                <h1 class="entry-title"><?php echo $hotel->post_title; ?></h1>
-            </header>
-
-            <div class="entry-content">
-                <?php echo apply_filters('the_content', $hotel->post_content); ?>
-            </div>
-
-            <?php
-            // Display subpages if any
-            $subpages = get_pages(array(
-                'child_of' => $hotel->ID,
-                'post_type' => 'hotel',
-                'sort_column' => 'menu_order'
-            ));
-
-            if ($subpages) {
-                echo '<div class="hotel-subpages">';
-                echo '<h2>' . __('Hotel Pages', 'astra') . '</h2>';
-                echo '<ul>';
-                foreach ($subpages as $subpage) {
-                    echo '<li><a href="' . get_permalink($subpage->ID) . '">' . $subpage->post_title . '</a></li>';
-                }
-                echo '</ul>';
-                echo '</div>';
-            }
-            ?>
-        </article>
-
-        <?php astra_primary_content_bottom(); ?>
-    </div>
-    <?php
-}
-
-get_footer(); 
+<?php get_footer(); ?>
