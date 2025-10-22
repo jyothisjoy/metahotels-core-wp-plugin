@@ -28,7 +28,7 @@ function mh_replace_hotels_listing() {
         return;
     }
     
-    // Replace the default listing with our Hotel Manager
+    // Always replace with Hotel Manager for hotel post type
     add_action('admin_enqueue_scripts', 'mh_hotel_manager_scripts');
     add_action('admin_footer', 'mh_inject_hotel_manager_html');
 }
@@ -180,7 +180,39 @@ function mh_get_hotel_manager_html($selected_hotel, $hotels, $pinned_hotels) {
                 <button type="button" id="refresh-tree" class="button">
                     <?php _e('Refresh', 'metahotels-core'); ?>
                 </button>
+                <button type="button" id="bulk-select-toggle" class="button">
+                    <span class="dashicons dashicons-yes-alt"></span>
+                    <?php _e('Bulk Select', 'metahotels-core'); ?>
+                </button>
             </div>
+            
+            <div class="mh-bulk-actions" style="display: none;">
+                <div class="mh-bulk-actions-bar">
+                    <span class="mh-bulk-count">0 items selected</span>
+                    <div class="mh-bulk-actions-buttons">
+                        <button type="button" id="bulk-edit" class="button">
+                            <?php _e('Bulk Edit', 'metahotels-core'); ?>
+                        </button>
+                        <button type="button" id="bulk-delete" class="button">
+                            <?php _e('Bulk Delete', 'metahotels-core'); ?>
+                        </button>
+                        <button type="button" id="bulk-restore" class="button" style="display: none;">
+                            <?php _e('Bulk Restore', 'metahotels-core'); ?>
+                        </button>
+                        <button type="button" id="bulk-cancel" class="button">
+                            <?php _e('Cancel', 'metahotels-core'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mh-trash-controls">
+                <button type="button" id="show-trash" class="button" data-active="false">
+                    <span class="dashicons dashicons-trash"></span>
+                    <?php _e('Show Trashed Items', 'metahotels-core'); ?>
+                </button>
+            </div>
+            
         </div>
         
         <!-- Tree Panel -->
@@ -253,6 +285,96 @@ function mh_get_hotel_manager_html($selected_hotel, $hotels, $pinned_hotels) {
                 </p>
                 <p class="mh-modal-actions">
                     <button type="submit" class="button button-primary"><?php _e('Add Page', 'metahotels-core'); ?></button>
+                    <button type="button" class="button mh-cancel"><?php _e('Cancel', 'metahotels-core'); ?></button>
+                </p>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Bulk Edit Modal -->
+    <div id="mh-bulk-edit-modal" class="mh-modal" style="display: none;">
+        <div class="mh-modal-content">
+            <h3><?php _e('Bulk Edit', 'metahotels-core'); ?></h3>
+            <form id="mh-bulk-edit-form">
+                <input type="hidden" id="bulk-post-ids" name="post_ids" value="">
+                <p>
+                    <label for="bulk-status"><?php _e('Status:', 'metahotels-core'); ?></label>
+                    <select id="bulk-status" name="status">
+                        <option value=""><?php _e('— No Change —', 'metahotels-core'); ?></option>
+                        <option value="publish"><?php _e('Published', 'metahotels-core'); ?></option>
+                        <option value="draft"><?php _e('Draft', 'metahotels-core'); ?></option>
+                        <option value="private"><?php _e('Private', 'metahotels-core'); ?></option>
+                    </select>
+                </p>
+                <p>
+                    <label for="bulk-author"><?php _e('Author:', 'metahotels-core'); ?></label>
+                    <select id="bulk-author" name="author">
+                        <option value=""><?php _e('— No Change —', 'metahotels-core'); ?></option>
+                        <?php
+                        $users = get_users(array('who' => 'authors'));
+                        foreach ($users as $user) {
+                            echo '<option value="' . esc_attr($user->ID) . '">' . esc_html($user->display_name) . '</option>';
+                        }
+                        ?>
+                    </select>
+                </p>
+                <p>
+                    <label for="bulk-parent"><?php _e('Parent Page:', 'metahotels-core'); ?></label>
+                    <select id="bulk-parent" name="parent">
+                        <option value=""><?php _e('— No Change —', 'metahotels-core'); ?></option>
+                        <option value="0"><?php _e('— No Parent —', 'metahotels-core'); ?></option>
+                    </select>
+                </p>
+                <p class="mh-modal-actions">
+                    <button type="submit" class="button button-primary"><?php _e('Update Pages', 'metahotels-core'); ?></button>
+                    <button type="button" class="button mh-cancel"><?php _e('Cancel', 'metahotels-core'); ?></button>
+                </p>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Quick Edit Modal -->
+    <div id="mh-quick-edit-modal" class="mh-modal" style="display: none;">
+        <div class="mh-modal-content">
+            <h3><?php _e('Quick Edit', 'metahotels-core'); ?></h3>
+            <form id="mh-quick-edit-form">
+                <input type="hidden" id="quick-edit-post-id" name="post_id" value="">
+                <p>
+                    <label for="quick-edit-title"><?php _e('Title:', 'metahotels-core'); ?></label>
+                    <input type="text" id="quick-edit-title" name="title" class="widefat" required>
+                </p>
+                <p>
+                    <label for="quick-edit-slug"><?php _e('Slug:', 'metahotels-core'); ?></label>
+                    <input type="text" id="quick-edit-slug" name="slug" class="widefat">
+                </p>
+                <p>
+                    <label for="quick-edit-status"><?php _e('Status:', 'metahotels-core'); ?></label>
+                    <select id="quick-edit-status" name="status">
+                        <option value="publish"><?php _e('Published', 'metahotels-core'); ?></option>
+                        <option value="draft"><?php _e('Draft', 'metahotels-core'); ?></option>
+                        <option value="private"><?php _e('Private', 'metahotels-core'); ?></option>
+                    </select>
+                </p>
+                <p>
+                    <label for="quick-edit-author"><?php _e('Author:', 'metahotels-core'); ?></label>
+                    <select id="quick-edit-author" name="author">
+                        <?php
+                        $users = get_users(array('who' => 'authors'));
+                        foreach ($users as $user) {
+                            echo '<option value="' . esc_attr($user->ID) . '">' . esc_html($user->display_name) . '</option>';
+                        }
+                        ?>
+                    </select>
+                </p>
+                <p>
+                    <label for="quick-edit-parent"><?php _e('Parent Page:', 'metahotels-core'); ?></label>
+                    <select id="quick-edit-parent" name="parent">
+                        <option value=""><?php _e('— No Change —', 'metahotels-core'); ?></option>
+                        <option value="0"><?php _e('— No Parent —', 'metahotels-core'); ?></option>
+                    </select>
+                </p>
+                <p class="mh-modal-actions">
+                    <button type="submit" class="button button-primary"><?php _e('Update Page', 'metahotels-core'); ?></button>
                     <button type="button" class="button mh-cancel"><?php _e('Cancel', 'metahotels-core'); ?></button>
                 </p>
             </form>
@@ -418,10 +540,15 @@ function mh_hotel_manager_page() {
 }
 
 // Get top-level hotels
-function mh_get_top_level_hotels() {
+function mh_get_top_level_hotels($include_trash = false) {
+    $post_status = array('publish', 'draft', 'private');
+    if ($include_trash) {
+        $post_status[] = 'trash';
+    }
+    
     $args = array(
         'post_type' => 'hotel',
-        'post_status' => array('publish', 'draft', 'private'),
+        'post_status' => $post_status,
         'posts_per_page' => -1,
         'post_parent' => 0,
         'orderby' => 'title',
@@ -432,7 +559,7 @@ function mh_get_top_level_hotels() {
 }
 
 // Render hotel tree
-function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
+function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0, $include_trash = false) {
     $output = '';
     
     // For the root level, first show the main hotel page, then its children
@@ -444,9 +571,14 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
         }
         
         // Check if hotel has children
+        $post_status = array('publish', 'draft', 'private');
+        if ($include_trash) {
+            $post_status[] = 'trash';
+        }
+        
         $has_children = get_posts(array(
             'post_type' => 'hotel',
-            'post_status' => array('publish', 'draft', 'private'),
+            'post_status' => $post_status,
             'posts_per_page' => 1,
             'post_parent' => $hotel_id
         ));
@@ -457,6 +589,9 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
         $output .= '<ul class="mh-tree-level mh-level-0">';
         $output .= '<li class="mh-tree-node ' . $status_class . ' ' . $has_children_class . '" data-post-id="' . $hotel->ID . '">';
         $output .= '<div class="mh-node-content">';
+        
+        // Bulk selection checkbox
+        $output .= '<input type="checkbox" class="mh-bulk-select" data-post-id="' . $hotel->ID . '" style="display: none;">';
         
         // Drag handle
         $output .= '<span class="mh-drag-handle dashicons dashicons-menu"></span>';
@@ -495,17 +630,25 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
         $output .= '<div class="mh-actions-dropdown">';
         $output .= '<button type="button" class="mh-actions-toggle dashicons dashicons-ellipsis"></button>';
         $output .= '<div class="mh-actions-menu">';
-        $output .= '<a href="#" class="mh-action" data-action="rename" data-post-id="' . $hotel->ID . '">' . __('Rename', 'metahotels-core') . '</a>';
-        $output .= '<a href="#" class="mh-action" data-action="duplicate" data-post-id="' . $hotel->ID . '">' . __('Duplicate', 'metahotels-core') . '</a>';
-        $output .= '<a href="#" class="mh-action" data-action="move" data-post-id="' . $hotel->ID . '">' . __('Move', 'metahotels-core') . '</a>';
-        $output .= '<a href="#" class="mh-action mh-action-danger" data-action="delete" data-post-id="' . $hotel->ID . '">' . __('Delete', 'metahotels-core') . '</a>';
+        
+        if ($hotel->post_status === 'trash') {
+            $output .= '<a href="#" class="mh-action" data-action="restore" data-post-id="' . $hotel->ID . '">' . __('Restore', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action mh-action-danger" data-action="delete-permanent" data-post-id="' . $hotel->ID . '">' . __('Delete Permanently', 'metahotels-core') . '</a>';
+        } else {
+            $output .= '<a href="#" class="mh-action" data-action="quick-edit" data-post-id="' . $hotel->ID . '">' . __('Quick Edit', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action" data-action="rename" data-post-id="' . $hotel->ID . '">' . __('Rename', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action" data-action="duplicate" data-post-id="' . $hotel->ID . '">' . __('Duplicate', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action" data-action="move" data-post-id="' . $hotel->ID . '">' . __('Move', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action mh-action-danger" data-action="delete" data-post-id="' . $hotel->ID . '">' . __('Delete', 'metahotels-core') . '</a>';
+        }
+        
         $output .= '</div>';
         $output .= '</div>';
         
         $output .= '</div>';
         
         // Recursively render children of the main hotel
-        $output .= mh_render_hotel_tree($hotel_id, $hotel_id, $level + 1);
+        $output .= mh_render_hotel_tree($hotel_id, $hotel_id, $level + 1, $include_trash);
         
         $output .= '</li>';
         $output .= '</ul>';
@@ -514,9 +657,14 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
     }
     
     // For deeper levels, show children of the given parent
+    $post_status = array('publish', 'draft', 'private');
+    if ($include_trash) {
+        $post_status[] = 'trash';
+    }
+    
     $children = get_posts(array(
         'post_type' => 'hotel',
-        'post_status' => array('publish', 'draft', 'private'),
+        'post_status' => $post_status,
         'posts_per_page' => -1,
         'post_parent' => $parent_id,
         'orderby' => 'menu_order',
@@ -532,7 +680,7 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
     foreach ($children as $child) {
         $has_children = get_posts(array(
             'post_type' => 'hotel',
-            'post_status' => array('publish', 'draft', 'private'),
+            'post_status' => $post_status,
             'posts_per_page' => 1,
             'post_parent' => $child->ID
         ));
@@ -542,6 +690,9 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
         
         $output .= '<li class="mh-tree-node ' . $status_class . ' ' . $has_children_class . '" data-post-id="' . $child->ID . '">';
         $output .= '<div class="mh-node-content">';
+        
+        // Bulk selection checkbox
+        $output .= '<input type="checkbox" class="mh-bulk-select" data-post-id="' . $child->ID . '" style="display: none;">';
         
         // Drag handle
         $output .= '<span class="mh-drag-handle dashicons dashicons-menu"></span>';
@@ -580,17 +731,25 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
         $output .= '<div class="mh-actions-dropdown">';
         $output .= '<button type="button" class="mh-actions-toggle dashicons dashicons-ellipsis"></button>';
         $output .= '<div class="mh-actions-menu">';
-        $output .= '<a href="#" class="mh-action" data-action="rename" data-post-id="' . $child->ID . '">' . __('Rename', 'metahotels-core') . '</a>';
-        $output .= '<a href="#" class="mh-action" data-action="duplicate" data-post-id="' . $child->ID . '">' . __('Duplicate', 'metahotels-core') . '</a>';
-        $output .= '<a href="#" class="mh-action" data-action="move" data-post-id="' . $child->ID . '">' . __('Move', 'metahotels-core') . '</a>';
-        $output .= '<a href="#" class="mh-action mh-action-danger" data-action="delete" data-post-id="' . $child->ID . '">' . __('Delete', 'metahotels-core') . '</a>';
+        
+        if ($child->post_status === 'trash') {
+            $output .= '<a href="#" class="mh-action" data-action="restore" data-post-id="' . $child->ID . '">' . __('Restore', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action mh-action-danger" data-action="delete-permanent" data-post-id="' . $child->ID . '">' . __('Delete Permanently', 'metahotels-core') . '</a>';
+        } else {
+            $output .= '<a href="#" class="mh-action" data-action="quick-edit" data-post-id="' . $child->ID . '">' . __('Quick Edit', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action" data-action="rename" data-post-id="' . $child->ID . '">' . __('Rename', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action" data-action="duplicate" data-post-id="' . $child->ID . '">' . __('Duplicate', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action" data-action="move" data-post-id="' . $child->ID . '">' . __('Move', 'metahotels-core') . '</a>';
+            $output .= '<a href="#" class="mh-action mh-action-danger" data-action="delete" data-post-id="' . $child->ID . '">' . __('Delete', 'metahotels-core') . '</a>';
+        }
+        
         $output .= '</div>';
         $output .= '</div>';
         
         $output .= '</div>';
         
         // Recursively render children
-        $output .= mh_render_hotel_tree($hotel_id, $child->ID, $level + 1);
+        $output .= mh_render_hotel_tree($hotel_id, $child->ID, $level + 1, $include_trash);
         
         $output .= '</li>';
     }
@@ -603,6 +762,7 @@ function mh_render_hotel_tree($hotel_id, $parent_id = 0, $level = 0) {
 // AJAX Handlers
 add_action('wp_ajax_mh_get_hotels', 'mh_ajax_get_hotels');
 add_action('wp_ajax_mh_get_tree', 'mh_ajax_get_tree');
+add_action('wp_ajax_mh_get_hotels_with_trash', 'mh_ajax_get_hotels_with_trash');
 add_action('wp_ajax_mh_add_child', 'mh_ajax_add_child');
 add_action('wp_ajax_mh_rename_post', 'mh_ajax_rename_post');
 add_action('wp_ajax_mh_duplicate_post', 'mh_ajax_duplicate_post');
@@ -611,7 +771,13 @@ add_action('wp_ajax_mh_move_post', 'mh_ajax_move_post');
 add_action('wp_ajax_mh_seed_defaults', 'mh_ajax_seed_defaults');
 add_action('wp_ajax_mh_pin_toggle', 'mh_ajax_pin_toggle');
 add_action('wp_ajax_mh_delete_post', 'mh_ajax_delete_post');
+add_action('wp_ajax_mh_restore_post', 'mh_ajax_restore_post');
+add_action('wp_ajax_mh_delete_permanent', 'mh_ajax_delete_permanent');
 add_action('wp_ajax_mh_duplicate_hotel', 'mh_ajax_duplicate_hotel');
+add_action('wp_ajax_mh_bulk_edit', 'mh_ajax_bulk_edit');
+add_action('wp_ajax_mh_quick_edit', 'mh_ajax_quick_edit');
+add_action('wp_ajax_mh_get_parent_options', 'mh_ajax_get_parent_options');
+add_action('wp_ajax_mh_get_post_data', 'mh_ajax_get_post_data');
 
 // AJAX: Get hotels
 function mh_ajax_get_hotels() {
@@ -648,6 +814,39 @@ function mh_ajax_get_hotels() {
     wp_send_json_success($results);
 }
 
+// AJAX: Get hotels with trash filter
+function mh_ajax_get_hotels_with_trash() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $include_trash = isset($_POST['include_trash']) && $_POST['include_trash'] == '1';
+    $hotels = mh_get_top_level_hotels($include_trash);
+    
+    $results = array();
+    foreach ($hotels as $hotel) {
+        $child_count = get_posts(array(
+            'post_type' => 'hotel',
+            'post_status' => $include_trash ? array('publish', 'draft', 'private', 'trash') : array('publish', 'draft', 'private'),
+            'posts_per_page' => -1,
+            'post_parent' => $hotel->ID,
+            'fields' => 'ids'
+        ));
+        
+        $results[] = array(
+            'id' => $hotel->ID,
+            'title' => $hotel->post_title,
+            'slug' => $hotel->post_name,
+            'status' => $hotel->post_status,
+            'child_count' => count($child_count)
+        );
+    }
+    
+    wp_send_json_success($results);
+}
+
 // AJAX: Get tree
 function mh_ajax_get_tree() {
     check_ajax_referer('mh_manager', 'nonce');
@@ -661,7 +860,8 @@ function mh_ajax_get_tree() {
         wp_send_json_error(__('Invalid hotel ID.', 'metahotels-core'));
     }
     
-    $tree_html = mh_render_hotel_tree($hotel_id);
+    $include_trash = isset($_POST['include_trash']) && $_POST['include_trash'] == '1';
+    $tree_html = mh_render_hotel_tree($hotel_id, 0, 0, $include_trash);
     wp_send_json_success(array('html' => $tree_html));
 }
 
@@ -1004,6 +1204,56 @@ function mh_ajax_delete_post() {
     ));
 }
 
+// AJAX: Restore post
+function mh_ajax_restore_post() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    $post_id = intval($_POST['post_id']);
+    
+    if (!$post_id) {
+        wp_send_json_error(__('Post ID is required.', 'metahotels-core'));
+    }
+    
+    if (!current_user_can('edit_post', $post_id)) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $result = wp_untrash_post($post_id);
+    
+    if (is_wp_error($result)) {
+        wp_send_json_error($result->get_error_message());
+    }
+    
+    wp_send_json_success(array(
+        'message' => __('Page restored from trash.', 'metahotels-core')
+    ));
+}
+
+// AJAX: Delete permanently
+function mh_ajax_delete_permanent() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    $post_id = intval($_POST['post_id']);
+    
+    if (!$post_id) {
+        wp_send_json_error(__('Post ID is required.', 'metahotels-core'));
+    }
+    
+    if (!current_user_can('delete_post', $post_id)) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $result = wp_delete_post($post_id, true);
+    
+    if (!$result) {
+        wp_send_json_error(__('Failed to delete post permanently.', 'metahotels-core'));
+    }
+    
+    wp_send_json_success(array(
+        'message' => __('Page deleted permanently.', 'metahotels-core')
+    ));
+}
+
 // AJAX: Duplicate entire hotel
 function mh_ajax_duplicate_hotel() {
     check_ajax_referer('mh_manager', 'nonce');
@@ -1070,6 +1320,9 @@ function mh_ajax_duplicate_hotel() {
     // Duplicate all child pages recursively
     $duplicated_pages = mh_duplicate_hotel_children($hotel_id, $new_hotel_id);
     
+    // Regenerate Elementor CSS for all duplicated pages
+    mh_regenerate_elementor_css($new_hotel_id);
+    
     wp_send_json_success(array(
         'hotel_id' => $new_hotel_id,
         'duplicated_pages' => $duplicated_pages,
@@ -1080,11 +1333,173 @@ function mh_ajax_duplicate_hotel() {
 // Helper function to copy post meta data
 function mh_copy_post_meta($source_id, $target_id) {
     $meta_data = get_post_meta($source_id);
+    
+    // Elementor meta keys that should be skipped during duplication
+    $elementor_skip_keys = array(
+        '_elementor_css',
+        '_elementor_edit_mode',
+        '_elementor_version',
+        '_elementor_pro_version',
+        '_elementor_page_settings',
+        '_elementor_data',
+        '_elementor_controls_usage',
+        '_elementor_page_assets',
+        '_elementor_custom_css',
+        '_elementor_page_assets',
+        '_elementor_edit_mode',
+        '_elementor_controls_usage',
+        '_elementor_page_settings',
+        '_elementor_data',
+        '_elementor_css',
+        '_elementor_version',
+        '_elementor_pro_version'
+    );
+    
     foreach ($meta_data as $key => $values) {
+        // Skip Elementor meta keys that cause issues when copied
+        if (in_array($key, $elementor_skip_keys)) {
+            continue;
+        }
+        
         foreach ($values as $value) {
             add_post_meta($target_id, $key, maybe_unserialize($value));
         }
     }
+    
+    // Handle Elementor data specially
+    mh_copy_elementor_data($source_id, $target_id);
+}
+
+// Helper function to properly copy Elementor data
+function mh_copy_elementor_data($source_id, $target_id) {
+    // Check if Elementor is active
+    if (!class_exists('Elementor\Plugin')) {
+        return;
+    }
+    
+    // Get Elementor data
+    $elementor_data = get_post_meta($source_id, '_elementor_data', true);
+    if ($elementor_data) {
+        // Update Elementor data to work with new post
+        $elementor_data = maybe_unserialize($elementor_data);
+        if (is_array($elementor_data)) {
+            // Clean and update Elementor data for new post
+            $elementor_data = mh_clean_elementor_data($elementor_data, $target_id);
+            update_post_meta($target_id, '_elementor_data', $elementor_data);
+        }
+    }
+    
+    // Copy other Elementor meta (but not CSS cache)
+    $elementor_meta_keys = array(
+        '_elementor_edit_mode',
+        '_elementor_version',
+        '_elementor_pro_version',
+        '_elementor_page_settings',
+        '_elementor_controls_usage'
+    );
+    
+    foreach ($elementor_meta_keys as $meta_key) {
+        $value = get_post_meta($source_id, $meta_key, true);
+        if ($value !== '') {
+            update_post_meta($target_id, $meta_key, $value);
+        }
+    }
+    
+    // Set Elementor edit mode
+    update_post_meta($target_id, '_elementor_edit_mode', 'builder');
+    
+    // Clear Elementor cache for the new post
+    mh_clear_elementor_cache($target_id);
+}
+
+// Helper function to clear Elementor cache
+function mh_clear_elementor_cache($post_id) {
+    // Check if Elementor is active
+    if (!class_exists('Elementor\Plugin')) {
+        return;
+    }
+    
+    // Clear Elementor CSS cache
+    delete_post_meta($post_id, '_elementor_css');
+    delete_post_meta($post_id, '_elementor_page_assets');
+    
+    // Regenerate CSS if Elementor has the method
+    if (method_exists('Elementor\Plugin', 'instance')) {
+        $elementor = \Elementor\Plugin::instance();
+        if (method_exists($elementor, 'files_manager')) {
+            $elementor->files_manager->clear_cache();
+        }
+    }
+    
+    // Force Elementor to regenerate CSS on next load
+    update_post_meta($post_id, '_elementor_css', '');
+}
+
+// Helper function to regenerate Elementor CSS for a hotel and all its children
+function mh_regenerate_elementor_css($hotel_id) {
+    // Check if Elementor is active
+    if (!class_exists('Elementor\Plugin')) {
+        return;
+    }
+    
+    // Get all pages in the hotel hierarchy
+    $all_pages = mh_get_all_hotel_pages($hotel_id);
+    
+    foreach ($all_pages as $page_id) {
+        // Clear and regenerate Elementor CSS for each page
+        mh_clear_elementor_cache($page_id);
+        
+        // Trigger Elementor CSS regeneration
+        if (method_exists('Elementor\Plugin', 'instance')) {
+            $elementor = \Elementor\Plugin::instance();
+            if (method_exists($elementor, 'frontend')) {
+                // Force CSS regeneration
+                $elementor->frontend->enqueue_styles();
+            }
+        }
+    }
+}
+
+// Helper function to get all pages in a hotel hierarchy
+function mh_get_all_hotel_pages($hotel_id) {
+    $pages = array($hotel_id);
+    
+    // Get all child pages recursively
+    $children = get_posts(array(
+        'post_type' => 'hotel',
+        'post_status' => array('publish', 'draft', 'private'),
+        'posts_per_page' => -1,
+        'post_parent' => $hotel_id,
+        'orderby' => 'menu_order',
+        'order' => 'ASC'
+    ));
+    
+    foreach ($children as $child) {
+        $pages[] = $child->ID;
+        // Recursively get grandchildren
+        $grandchildren = mh_get_all_hotel_pages($child->ID);
+        $pages = array_merge($pages, $grandchildren);
+    }
+    
+    return $pages;
+}
+
+// Helper function to clean Elementor data for new post
+function mh_clean_elementor_data($data, $new_post_id) {
+    if (!is_array($data)) {
+        return $data;
+    }
+    
+    foreach ($data as $key => $value) {
+        if (is_array($value)) {
+            $data[$key] = mh_clean_elementor_data($value, $new_post_id);
+        } elseif (is_string($value)) {
+            // Clean any post ID references in Elementor data
+            $data[$key] = str_replace('"post_id":', '"post_id":', $value);
+        }
+    }
+    
+    return $data;
 }
 
 // Helper function to copy post taxonomies
@@ -1152,4 +1567,180 @@ function mh_duplicate_hotel_children($parent_id, $new_parent_id) {
     }
     
     return $duplicated_count;
+}
+
+// AJAX: Bulk edit
+function mh_ajax_bulk_edit() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $post_ids = array_map('intval', $_POST['post_ids'] ?? array());
+    $status = sanitize_text_field($_POST['status'] ?? '');
+    $author = $_POST['author'] ?? '';
+    $author = $author === '' ? 0 : intval($author);
+    $parent = $_POST['parent'] ?? '';
+    $parent = $parent === '' ? -1 : intval($parent);
+    
+    if (empty($post_ids)) {
+        wp_send_json_error(__('No posts selected.', 'metahotels-core'));
+    }
+    
+    $updated_count = 0;
+    $errors = array();
+    
+    foreach ($post_ids as $post_id) {
+        if (!current_user_can('edit_post', $post_id)) {
+            continue;
+        }
+        
+        $post_data = array('ID' => $post_id);
+        
+        if (!empty($status)) {
+            $post_data['post_status'] = $status;
+        }
+        
+        if ($author > 0) {
+            $post_data['post_author'] = $author;
+        }
+        
+        if ($parent >= 0) {
+            $post_data['post_parent'] = $parent;
+        }
+        
+        $result = wp_update_post($post_data);
+        
+        if (is_wp_error($result)) {
+            $errors[] = sprintf(__('Failed to update post %d: %s', 'metahotels-core'), $post_id, $result->get_error_message());
+        } else {
+            $updated_count++;
+        }
+    }
+    
+    if ($updated_count > 0) {
+        $message = sprintf(__('%d posts updated successfully.', 'metahotels-core'), $updated_count);
+        if (!empty($errors)) {
+            $message .= ' ' . implode(' ', $errors);
+        }
+        wp_send_json_success(array('message' => $message));
+    } else {
+        wp_send_json_error(__('No posts were updated.', 'metahotels-core'));
+    }
+}
+
+// AJAX: Quick edit
+function mh_ajax_quick_edit() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    $post_id = intval($_POST['post_id']);
+    $title = sanitize_text_field($_POST['title']);
+    $slug = sanitize_title($_POST['slug']);
+    $status = sanitize_text_field($_POST['status']);
+    $author = $_POST['author'] ?? '';
+    $author = $author === '' ? 0 : intval($author);
+    $parent = $_POST['parent'] ?? '';
+    $parent = $parent === '' ? -1 : intval($parent);
+    
+    if (!$post_id || !$title) {
+        wp_send_json_error(__('Post ID and title are required.', 'metahotels-core'));
+    }
+    
+    if (!current_user_can('edit_post', $post_id)) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $post_data = array(
+        'ID' => $post_id,
+        'post_title' => $title,
+        'post_name' => $slug,
+        'post_status' => $status
+    );
+    
+    if ($author > 0) {
+        $post_data['post_author'] = $author;
+    }
+    
+    if ($parent >= 0) {
+        $post_data['post_parent'] = $parent;
+    }
+    
+    $result = wp_update_post($post_data);
+    
+    if (is_wp_error($result)) {
+        wp_send_json_error($result->get_error_message());
+    }
+    
+    wp_send_json_success(array(
+        'message' => __('Page updated successfully.', 'metahotels-core')
+    ));
+}
+
+// AJAX: Get parent options
+function mh_ajax_get_parent_options() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $hotel_id = intval($_POST['hotel_id'] ?? 0);
+    $exclude_id = intval($_POST['exclude_id'] ?? 0);
+    
+    if (!$hotel_id) {
+        wp_send_json_error(__('Hotel ID is required.', 'metahotels-core'));
+    }
+    
+    $options = array();
+    
+    // Get all pages in the hotel hierarchy
+    $pages = get_posts(array(
+        'post_type' => 'hotel',
+        'post_status' => array('publish', 'draft', 'private'),
+        'posts_per_page' => -1,
+        'post_parent' => $hotel_id,
+        'exclude' => array($exclude_id),
+        'orderby' => 'menu_order',
+        'order' => 'ASC'
+    ));
+    
+    foreach ($pages as $page) {
+        $options[] = array(
+            'value' => $page->ID,
+            'text' => $page->post_title
+        );
+    }
+    
+    wp_send_json_success($options);
+}
+
+// AJAX: Get post data
+function mh_ajax_get_post_data() {
+    check_ajax_referer('mh_manager', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_die(__('Insufficient permissions.', 'metahotels-core'));
+    }
+    
+    $post_id = intval($_POST['post_id']);
+    
+    if (!$post_id) {
+        wp_send_json_error(__('Post ID is required.', 'metahotels-core'));
+    }
+    
+    $post = get_post($post_id);
+    if (!$post) {
+        wp_send_json_error(__('Post not found.', 'metahotels-core'));
+    }
+    
+    $data = array(
+        'title' => $post->post_title,
+        'slug' => $post->post_name,
+        'status' => $post->post_status,
+        'author' => $post->post_author,
+        'parent' => $post->post_parent
+    );
+    
+    wp_send_json_success($data);
 }
