@@ -11,6 +11,11 @@
  * Register the 'offer' custom post type.
  */
 function create_offers_post_type() {
+    // Check if post type is enabled
+    if (!get_option('metahotels_enable_offers', true)) {
+        return; // Don't register if disabled
+    }
+
     $labels = array(
         'name'                  => _x('Offers', 'Post Type General Name', 'metahotels'),
         'singular_name'         => _x('Offer', 'Post Type Singular Name', 'metahotels'),
@@ -69,6 +74,11 @@ add_action('init', 'create_offers_post_type', 1);
  * Register the 'offer_category' taxonomy for Offers.
  */
 function create_offer_taxonomy() {
+    // Only register taxonomy if the offers post type is enabled
+    if (!get_option('metahotels_enable_offers', true)) {
+        return;
+    }
+
     $labels = array(
         'name'              => _x('Offer Categories', 'taxonomy general name', 'metahotels'),
         'singular_name'     => _x('Offer Category', 'taxonomy singular name', 'metahotels'),
@@ -111,6 +121,7 @@ add_action('add_meta_boxes', 'add_offer_meta_box');
  * Output Timings and Menu URL fields.
  */
 function offer_meta_box_html($post) {
+    wp_nonce_field('offer_meta_box', 'offer_meta_box_nonce');
     $timings = get_post_meta($post->ID, '_timings_meta_key', true);
     $menu_url = get_post_meta($post->ID, '_menu_url_meta_key', true);
     $offer_url = get_post_meta($post->ID, '_offer_url_meta_key', true);
@@ -201,6 +212,7 @@ function offer_meta_box_html($post) {
 function save_offer_meta_box($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     if (!current_user_can('edit_post', $post_id)) return;
+    if (!isset($_POST['offer_meta_box_nonce']) || !wp_verify_nonce($_POST['offer_meta_box_nonce'], 'offer_meta_box')) return;
 
     if (isset($_POST['timings_field'])) {
         update_post_meta($post_id, '_timings_meta_key', sanitize_text_field($_POST['timings_field']));
@@ -222,5 +234,3 @@ function save_offer_meta_box($post_id) {
     }
 }
 add_action('save_post', 'save_offer_meta_box');
-
-?>

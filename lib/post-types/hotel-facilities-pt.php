@@ -1,6 +1,11 @@
 <?php
 // Register the facility custom post type
 function meta_hotels_register_facility_post_type() {
+    // Check if post type is enabled
+    if (!get_option('metahotels_enable_facilities', true)) {
+        return; // Don't register if disabled
+    }
+
     $labels = array(
         'name' => 'Facilities',
         'singular_name' => 'Facility',
@@ -19,17 +24,20 @@ function meta_hotels_register_facility_post_type() {
     $args = array(
         'labels' => $labels,
         'public' => true,
-        'exclude_from_search' => true,
-        'publicly_queryable' => false,
+        'publicly_queryable' => true,
         'show_ui' => true,
         'show_in_menu' => true,
-        'rewrite' => false,
+        'query_var' => true,
+        'rewrite' => array(
+            'slug' => 'facility',
+            'with_front' => false
+        ),
         'capability_type' => 'post',
-        'has_archive' => false,
-        'hierarchical' => false,
-        'menu_position' => 20,
-        'menu_icon' => 'dashicons-admin-tools',
-        'supports' => array( 'title', 'thumbnail', 'excerpt', 'author' ),
+        'has_archive' => true,
+        'hierarchical' => true,
+        'menu_position' => 5,
+        'menu_icon' => 'dashicons-building',
+        'supports' => array('title', 'editor', 'thumbnail', 'excerpt', 'custom-fields', 'author', 'page-attributes'),
     );
     
     register_post_type( 'facility', $args );

@@ -1,5 +1,10 @@
 <?php
 function register_careers_post_type() {
+    // Check if post type is enabled
+    if (!get_option('metahotels_enable_careers', true)) {
+        return; // Don't register if disabled
+    }
+
     $labels = array(
         'name'               => 'Careers',
         'singular_name'      => 'Career',
@@ -29,7 +34,7 @@ function register_careers_post_type() {
         'menu_position'       => 5,
         'menu_icon'           => 'dashicons-businessman',
         'supports'            => array( 'title', 'editor', 'thumbnail', 'excerpt', 'custom-fields', 'author' ),
-        'taxonomies'          => array( 'career_category' ) // Update the taxonomy name to 'career_category'
+        'taxonomies'          => array( 'career_category' )
     );
 
     register_post_type( 'career', $args );
@@ -37,6 +42,11 @@ function register_careers_post_type() {
 add_action( 'init', 'register_careers_post_type' );
 
 function register_career_category_taxonomy() {
+    // Only register taxonomy if the careers post type is enabled
+    if (!get_option('metahotels_enable_careers', true)) {
+        return;
+    }
+
     $labels = array(
         'name'              => 'Career Categories',
         'singular_name'     => 'Career Category',
@@ -57,7 +67,7 @@ function register_career_category_taxonomy() {
         'show_ui'           => true,
         'show_admin_column' => true,
         'query_var'         => true,
-        'rewrite'           => array( 'slug' => 'career-category' ), // Specify the desired slug for the taxonomy
+        'rewrite'           => array( 'slug' => 'career-category' ),
     );
 
     register_taxonomy( 'career_category', 'career', $args );

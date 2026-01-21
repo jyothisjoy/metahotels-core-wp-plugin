@@ -3,7 +3,6 @@
 add_shortcode('metahotels_roomlist', 'metahotels_roomlist_shortcode');
 
 // Shortcode function
-// Shortcode function
 function metahotels_roomlist_shortcode($atts) {
     // Extract the hotel ID from the shortcode attributes
     $hotel_id = isset($atts['hotel_id']) ? $atts['hotel_id'] : '';
@@ -12,9 +11,18 @@ function metahotels_roomlist_shortcode($atts) {
         return 'Please provide a hotel ID.';
     }
 
-    // API URL with the hotel ID
+    // Generate a unique cache key based on hotel ID and date
     $currentDate = date('d/m/Y');
-   	$sanitizedDate = urlencode($currentDate);
+    $sanitizedDate = urlencode($currentDate);
+    $cache_key = 'metahotels_rooms_' . $hotel_id . '_' . md5($currentDate);
+    
+    // Check for cached data
+    $cached_output = get_transient($cache_key);
+    if ($cached_output !== false) {
+        return $cached_output;
+    }
+
+    // API URL with the hotel ID
     $api_url_room = 'https://api.mirai.com/MiraiWebService/roomInfo/' . $hotel_id;
     $api_url_price = 'https://api.mirai.com/MiraiWebService/availableRate/get?hotelId='. $hotel_id .'&checkin='. $sanitizedDate .'&nights=1&numAdults=2&numChildren=1';
 
@@ -29,10 +37,7 @@ function metahotels_roomlist_shortcode($atts) {
     $response_api_price = wp_remote_get($api_url_price, array('headers' => $headers));
 
     // Check for errors
-    if (is_wp_error($response_api_room)) {
-        return 'Error retrieving data.';
-    }
-    if (is_wp_error($response_api_price)) {
+    if (is_wp_error($response_api_room) || is_wp_error($response_api_price)) {
         return 'Error retrieving data.';
     }
 
@@ -52,27 +57,30 @@ function metahotels_roomlist_shortcode($atts) {
         foreach ($data_room['rooms'] as $room) {
             $output .= '<div class="mh-room">
             <div class="mh-room-image">
-                <img src="' . $room['mainPhotoUrl'] . '" alt="' . $room['title'] . '">
+                <img src="' . esc_url($room['mainPhotoUrl']) . '" alt="' . esc_attr($room['title']) . '">
             </div>
             <div class="mh-room-content">
-                <h4>'.$room['title'].'</h4><p>
-				'.$room['description'].'
+                <h4>'.esc_html($room['title']).'</h4><p>
+				'.wp_kses_post($room['description']).'
 				</p>';
                 $netPrices = array(); // Initialize an empty array
-                foreach ($data_price['availableRates'][$hotel_id] as $rate) {
-                    if ($rate['roomTypeId'] == $room['roomId']) {
-                        $netPrices[] = $rate['netPrice']; // Add the net price to the array
+                $currency = '';
+                
+                if (isset($data_price['availableRates'][$hotel_id]) && is_array($data_price['availableRates'][$hotel_id])) {
+                    foreach ($data_price['availableRates'][$hotel_id] as $rate) {
+                        if ($rate['roomTypeId'] == $room['roomId']) {
+                            $netPrices[] = $rate['netPrice']; // Add the net price to the array
+                        }
+                        $currency = $rate['currency'];
                     }
-                    $currecy = $rate['currency'];
                 }
-                $lowestRate = '';
-                $highestRate = '';
+                
                 if (!empty($netPrices)) {
                     $lowestRate = min($netPrices);
                     $highestRate = max($netPrices);
                 
                     $output .= '<p class="price">Starting from <br>';
-                    $output .= '<s>'.$highestRate.''.$currecy.'</s><br>'.$lowestRate.' '.$currecy;
+                    $output .= '<s>'.$highestRate.''.$currency.'</s><br>'.$lowestRate.' '.$currency;
                     $output .= '</p>';
                 }
                 $output .='<div class="mh-room-button-wrapper">
@@ -83,9 +91,12 @@ function metahotels_roomlist_shortcode($atts) {
         }
 
         $output .= '</div></section>';
+        
+        // Cache the output for 1 hour (3600 seconds)
+        set_transient($cache_key, $output, 3600);
+        
         return $output;
     }
-
 
     // If no rooms are found, return a message
     return 'No rooms available.';

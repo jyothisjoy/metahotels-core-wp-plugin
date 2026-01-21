@@ -1,5 +1,10 @@
 <?php
 function register_hotel_rooms_post_type() {
+    // Check if post type is enabled
+    if (!get_option('metahotels_enable_hotel_rooms', true)) {
+        return; // Don't register if disabled
+    }
+
     $labels = array(
         'name'               => 'Hotel Rooms',
         'singular_name'      => 'Hotel Room',
@@ -29,13 +34,19 @@ function register_hotel_rooms_post_type() {
         'menu_position'       => 5,
         'menu_icon'           => 'dashicons-admin-home',
         'supports'            => array( 'title', 'editor', 'thumbnail', 'excerpt', 'custom-fields', 'author' ),
-        'taxonomies'          => array( 'hotel_category' ) // Update the taxonomy name to 'hotel_category'
+        'taxonomies'          => array( 'hotel_category' )
     );
 
     register_post_type( 'hotel_room', $args );
 }
 add_action( 'init', 'register_hotel_rooms_post_type' );
+
 function register_hotel_category_taxonomy() {
+    // Only register taxonomy if the hotel rooms post type is enabled
+    if (!get_option('metahotels_enable_hotel_rooms', true)) {
+        return;
+    }
+
     $labels = array(
         'name'              => 'Hotel Categories',
         'singular_name'     => 'Hotel Category',
@@ -56,7 +67,7 @@ function register_hotel_category_taxonomy() {
         'show_ui'           => true,
         'show_admin_column' => true,
         'query_var'         => true,
-        'rewrite'           => array( 'slug' => 'hotel-category' ), // Specify the desired slug for the taxonomy
+        'rewrite'           => array( 'slug' => 'hotel-category' ),
     );
 
     register_taxonomy( 'hotel_category', 'hotel_room', $args );

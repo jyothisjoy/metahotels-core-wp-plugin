@@ -1,6 +1,11 @@
 <?php
 // Register the destination custom post type
 function register_destination_post_type() {
+    // Check if post type is enabled
+    if (!get_option('metahotels_enable_destinations', true)) {
+        return; // Don't register if disabled
+    }
+
     $labels = array(
         'name' => 'Destinations',
         'singular_name' => 'Destination',
@@ -37,6 +42,11 @@ add_action('init', 'register_destination_post_type');
 
 // Register taxonomies for destinations
 function register_destination_taxonomies() {
+    // Only register taxonomies if the destinations post type is enabled
+    if (!get_option('metahotels_enable_destinations', true)) {
+        return;
+    }
+
     // Region Taxonomy
     register_taxonomy('region', 'destination', array(
         'hierarchical' => true,

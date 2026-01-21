@@ -1,6 +1,11 @@
 <?php
 // Register the custom post type "Hotel Surroundings"
 function register_hotel_surroundings_post_type() {
+    // Check if post type is enabled
+    if (!get_option('metahotels_enable_hotel_surroundings', true)) {
+        return; // Don't register if disabled
+    }
+
     $labels = array(
         'name' => 'Hotel Surroundings',
         'singular_name' => 'Hotel Surrounding',
@@ -21,7 +26,7 @@ function register_hotel_surroundings_post_type() {
         'public' => true,
         'show_ui' => true,
         'show_in_menu' => true,
-        'rewrite' => array('slug' => 'nearby'), // Changed rewrite to use 'nearby' slug
+        'rewrite' => array('slug' => 'nearby'),
         'capability_type' => 'post',
         'has_archive' => false,
         'hierarchical' => false,
@@ -36,6 +41,11 @@ add_action('init', 'register_hotel_surroundings_post_type');
 
 // Register the taxonomy "Surroundings Category" for "Hotel Surroundings" post type
 function register_surroundings_category_taxonomy() {
+    // Only register taxonomy if the hotel surroundings post type is enabled
+    if (!get_option('metahotels_enable_hotel_surroundings', true)) {
+        return;
+    }
+
     $labels = array(
         'name' => 'Surroundings Categories',
         'singular_name' => 'Surroundings Category',

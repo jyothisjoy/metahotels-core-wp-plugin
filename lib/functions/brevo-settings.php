@@ -20,6 +20,11 @@ add_action('admin_menu', 'metahotels_brevo_admin_menu');
 // Register settings
 function metahotels_brevo_register_settings() {
     register_setting('metahotels_brevo_options', 'metahotels_brevo_api_key');
+    register_setting('metahotels_brevo_options', 'metahotels_brevo_recaptcha_site_key');
+    register_setting('metahotels_brevo_options', 'metahotels_brevo_recaptcha_secret_key');
+    register_setting('metahotels_brevo_options', 'metahotels_brevo_recaptcha_score_threshold', array(
+        'default' => 0.5
+    ));
     register_setting('metahotels_brevo_options', 'metahotels_brevo_lists', array(
         'type' => 'array',
         'default' => array()
@@ -30,17 +35,11 @@ function metahotels_brevo_register_settings() {
     register_setting('metahotels_brevo_options', 'metahotels_brevo_advanced_validation', array(
         'default' => false
     ));
-    register_setting('metahotels_brevo_options', 'metahotels_brevo_bot_protection', array(
-        'default' => true
-    ));
-    register_setting('metahotels_brevo_options', 'metahotels_brevo_rate_limit', array(
-        'default' => 5
-    ));
-    register_setting('metahotels_brevo_options', 'metahotels_brevo_rate_timeframe', array(
-        'default' => 3600
-    ));
     register_setting('metahotels_brevo_options', 'metahotels_brevo_debug_mode', array(
         'default' => false
+    ));
+    register_setting('metahotels_brevo_options', 'metahotels_ipapi_api_key', array(
+        'sanitize_callback' => 'sanitize_text_field'
     ));
 }
 add_action('admin_init', 'metahotels_brevo_register_settings');
@@ -48,37 +47,55 @@ add_action('admin_init', 'metahotels_brevo_register_settings');
 // Settings page HTML
 function metahotels_brevo_settings_page() {
     $api_key = get_option('metahotels_brevo_api_key', '');
+    $recaptcha_site_key = get_option('metahotels_brevo_recaptcha_site_key', '');
+    $recaptcha_secret_key = get_option('metahotels_brevo_recaptcha_secret_key', '');
+    $recaptcha_score_threshold = get_option('metahotels_brevo_recaptcha_score_threshold', 0.5);
     $lists = get_option('metahotels_brevo_lists', array());
     $default_country = get_option('metahotels_brevo_default_country', 'IN');
     $advanced_validation = get_option('metahotels_brevo_advanced_validation', false);
-    $bot_protection = get_option('metahotels_brevo_bot_protection', true);
-    $rate_limit = get_option('metahotels_brevo_rate_limit', 5);
-    $rate_timeframe = get_option('metahotels_brevo_rate_timeframe', 3600);
     $debug_mode = get_option('metahotels_brevo_debug_mode', false);
+    $ipapi_api_key = get_option('metahotels_ipapi_api_key', '');
     
     // Handle API key update and fetch lists
-    if (isset($_POST['submit']) && !empty($_POST['metahotels_brevo_api_key'])) {
-        $new_api_key = sanitize_text_field($_POST['metahotels_brevo_api_key']);
-        $new_default_country = sanitize_text_field($_POST['metahotels_brevo_default_country']);
-        $new_advanced_validation = isset($_POST['metahotels_brevo_advanced_validation']) ? true : false;
-        $new_bot_protection = isset($_POST['metahotels_brevo_bot_protection']) ? true : false;
-        $new_rate_limit = intval($_POST['metahotels_brevo_rate_limit']);
-        $new_rate_timeframe = intval($_POST['metahotels_brevo_rate_timeframe']);
-        $new_debug_mode = isset($_POST['metahotels_brevo_debug_mode']) ? true : false;
+    if (isset($_POST['submit'])) {
+        $new_api_key = isset($_POST['metahotels_brevo_api_key']) ? sanitize_text_field($_POST['metahotels_brevo_api_key']) : $api_key;
+        $new_recaptcha_site_key = isset($_POST['metahotels_brevo_recaptcha_site_key']) ? sanitize_text_field($_POST['metahotels_brevo_recaptcha_site_key']) : $recaptcha_site_key;
+        $new_recaptcha_secret_key = isset($_POST['metahotels_brevo_recaptcha_secret_key']) ? sanitize_text_field($_POST['metahotels_brevo_recaptcha_secret_key']) : $recaptcha_secret_key;
+        $new_recaptcha_score_threshold = isset($_POST['metahotels_brevo_recaptcha_score_threshold']) ? floatval($_POST['metahotels_brevo_recaptcha_score_threshold']) : $recaptcha_score_threshold;
+        // Ensure threshold is between 0 and 1
+        if ($new_recaptcha_score_threshold < 0) {
+            $new_recaptcha_score_threshold = 0;
+        } elseif ($new_recaptcha_score_threshold > 1) {
+            $new_recaptcha_score_threshold = 1;
+        }
+        $new_default_country = isset($_POST['metahotels_brevo_default_country']) ? sanitize_text_field($_POST['metahotels_brevo_default_country']) : $default_country;
+        $new_advanced_validation = isset($_POST['metahotels_brevo_advanced_validation']) && $_POST['metahotels_brevo_advanced_validation'] == '1' ? true : false;
+        $new_debug_mode = isset($_POST['metahotels_brevo_debug_mode']) && $_POST['metahotels_brevo_debug_mode'] == '1' ? true : false;
+        $new_ipapi_api_key = isset($_POST['metahotels_ipapi_api_key']) ? sanitize_text_field($_POST['metahotels_ipapi_api_key']) : $ipapi_api_key;
         
         update_option('metahotels_brevo_api_key', $new_api_key);
+        update_option('metahotels_ipapi_api_key', $new_ipapi_api_key);
         update_option('metahotels_brevo_default_country', $new_default_country);
+        update_option('metahotels_brevo_recaptcha_site_key', $new_recaptcha_site_key);
+        update_option('metahotels_brevo_recaptcha_secret_key', $new_recaptcha_secret_key);
+        update_option('metahotels_brevo_recaptcha_score_threshold', $new_recaptcha_score_threshold);
         update_option('metahotels_brevo_advanced_validation', $new_advanced_validation);
-        update_option('metahotels_brevo_bot_protection', $new_bot_protection);
-        update_option('metahotels_brevo_rate_limit', $new_rate_limit);
-        update_option('metahotels_brevo_rate_timeframe', $new_rate_timeframe);
         update_option('metahotels_brevo_debug_mode', $new_debug_mode);
         
-        // Fetch lists from Brevo
-        $lists = metahotels_brevo_fetch_lists($new_api_key);
-        update_option('metahotels_brevo_lists', $lists);
+        // Update local variables for display
+        $debug_mode = $new_debug_mode;
         
-        echo '<div class="notice notice-success"><p>Settings updated and lists fetched successfully!</p></div>';
+        // Only fetch lists if API key is provided
+        if (!empty($new_api_key)) {
+        
+            // Fetch lists from Brevo
+            $lists = metahotels_brevo_fetch_lists($new_api_key);
+            update_option('metahotels_brevo_lists', $lists);
+            
+            echo '<div class="notice notice-success"><p>Settings updated and lists fetched successfully!</p></div>';
+        } else {
+            echo '<div class="notice notice-success"><p>Settings updated successfully!</p></div>';
+        }
     }
     
     // Handle test contact creation
@@ -121,6 +138,61 @@ function metahotels_brevo_settings_page() {
                 </tr>
                 <tr>
                     <th scope="row">
+                        <label for="metahotels_ipapi_api_key">ipapi.com API Key</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               id="metahotels_ipapi_api_key" 
+                               name="metahotels_ipapi_api_key" 
+                               value="<?php echo esc_attr($ipapi_api_key); ?>" 
+                               class="regular-text" />
+                        <p class="description">Enter your ipapi.com API key for automatic country code detection. Get your free API key from <a href="https://ipapi.com/signup/" target="_blank">ipapi.com</a>. This enables automatic detection of the user's country calling code based on their IP address.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="metahotels_brevo_recaptcha_site_key">reCAPTCHA v3 Site Key</label>
+                    </th>
+                    <td>
+                        <input type="text"
+                               id="metahotels_brevo_recaptcha_site_key"
+                               name="metahotels_brevo_recaptcha_site_key"
+                               value="<?php echo esc_attr($recaptcha_site_key); ?>"
+                               class="regular-text" />
+                        <p class="description">Enter your Google reCAPTCHA v3 <strong>Site Key</strong>. Leave empty to disable reCAPTCHA protection on the Brevo form.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="metahotels_brevo_recaptcha_secret_key">reCAPTCHA v3 Secret Key</label>
+                    </th>
+                    <td>
+                        <input type="password"
+                               id="metahotels_brevo_recaptcha_secret_key"
+                               name="metahotels_brevo_recaptcha_secret_key"
+                               value="<?php echo esc_attr($recaptcha_secret_key); ?>"
+                               class="regular-text" autocomplete="off" />
+                        <p class="description">Enter your Google reCAPTCHA v3 <strong>Secret Key</strong>. This is used on the server to verify scores.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="metahotels_brevo_recaptcha_score_threshold">reCAPTCHA v3 Sensitivity (0 – 1)</label>
+                    </th>
+                    <td>
+                        <input type="number"
+                               step="0.1"
+                               min="0"
+                               max="1"
+                               id="metahotels_brevo_recaptcha_score_threshold"
+                               name="metahotels_brevo_recaptcha_score_threshold"
+                               value="<?php echo esc_attr($recaptcha_score_threshold); ?>"
+                               class="small-text" />
+                        <p class="description">Minimum reCAPTCHA v3 score required to accept a submission. <strong>Higher values are more strict</strong> (default: 0.5).</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
                         <label for="metahotels_brevo_default_country">Default Country for Phone Numbers</label>
                     </th>
                     <td>
@@ -148,58 +220,21 @@ function metahotels_brevo_settings_page() {
                 </tr>
                 <tr>
                     <th scope="row">
-                        <label for="metahotels_brevo_bot_protection">Enable Bot Protection</label>
-                    </th>
-                    <td>
-                        <input type="checkbox" 
-                               id="metahotels_brevo_bot_protection" 
-                               name="metahotels_brevo_bot_protection" 
-                               value="1" 
-                               <?php checked($bot_protection, true); ?> />
-                        <p class="description">Enable honeypot fields, rate limiting, and other bot protection measures.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_rate_limit">Rate Limit (submissions per hour)</label>
-                    </th>
-                    <td>
-                        <input type="number" 
-                               id="metahotels_brevo_rate_limit" 
-                               name="metahotels_brevo_rate_limit" 
-                               value="<?php echo esc_attr($rate_limit); ?>" 
-                               min="1" 
-                               max="100" 
-                               class="small-text" />
-                        <p class="description">Maximum number of form submissions allowed per IP address per hour.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_rate_timeframe">Rate Limit Timeframe (seconds)</label>
-                    </th>
-                    <td>
-                        <input type="number" 
-                               id="metahotels_brevo_rate_timeframe" 
-                               name="metahotels_brevo_rate_timeframe" 
-                               value="<?php echo esc_attr($rate_timeframe); ?>" 
-                               min="60" 
-                               max="86400" 
-                               class="small-text" />
-                        <p class="description">Time window for rate limiting (3600 = 1 hour).</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
                         <label for="metahotels_brevo_debug_mode">Enable Debug Mode</label>
                     </th>
                     <td>
+                        <input type="hidden" name="metahotels_brevo_debug_mode" value="0" />
                         <input type="checkbox" 
                                id="metahotels_brevo_debug_mode" 
                                name="metahotels_brevo_debug_mode" 
                                value="1" 
                                <?php checked($debug_mode, true); ?> />
-                        <p class="description">Enable this to see detailed error messages and debug information in the browser console.</p>
+                        <p class="description">Enable this to see detailed error messages and debug information in the browser console. Open your browser's developer tools (F12) and check the Console tab when testing the form.</p>
+                        <?php if ($debug_mode): ?>
+                        <p style="color: green; font-weight: bold;">✓ Debug mode is currently ENABLED. Open browser console (F12) to view detailed logs.</p>
+                        <?php else: ?>
+                        <p style="color: #666;">Debug mode is currently disabled. Enable it to see detailed logs in the browser console.</p>
+                        <?php endif; ?>
                     </td>
                 </tr>
             </table>
@@ -286,6 +321,26 @@ function metahotels_brevo_settings_page() {
             <p>This will create a test contact in the first available list:</p>
             <button type="submit" class="button button-secondary">Test Contact Creation</button>
         </form>
+        <?php endif; ?>
+        
+        <?php if ($debug_mode): ?>
+        <h2>Debug Information</h2>
+        <p><strong>Debug mode is enabled.</strong> All form submissions and API calls will be logged to your browser console.</p>
+        <p><strong>To view debug logs:</strong></p>
+        <ol>
+            <li>Open your browser's Developer Tools (press <strong>F12</strong> or right-click and select "Inspect")</li>
+            <li>Go to the <strong>Console</strong> tab</li>
+            <li>Submit the Brevo form on your website</li>
+            <li>Look for log entries prefixed with "=== Brevo Form Submission Debug ===" or "Brevo"</li>
+        </ol>
+        <p><strong>What you'll see in the console:</strong></p>
+        <ul>
+            <li>Form data being submitted</li>
+            <li>AJAX request details</li>
+            <li>API responses from Brevo</li>
+            <li>Any errors with full details</li>
+        </ul>
+        <p><em>Note: Make sure to disable debug mode on production sites for security.</em></p>
         <?php endif; ?>
         <?php endif; ?>
     </div>
@@ -543,132 +598,70 @@ function metahotels_advanced_whatsapp_validation($phone_number, $country_code) {
         'valid' => true,
         'message' => 'Basic validation passed. For advanced validation, integrate with a phone validation service.'
     );
-} 
-
-// Bot protection functions
-function metahotels_generate_honeypot_field() {
-    $field_name = 'website_' . wp_rand(1000, 9999);
-    $field_id = 'website_' . wp_rand(1000, 9999);
-    
-    return array(
-        'name' => $field_name,
-        'id' => $field_id,
-        'hash' => wp_hash($field_name . 'honeypot')
-    );
 }
 
-function metahotels_verify_honeypot($honeypot_data) {
-    if (empty($honeypot_data['name']) || empty($honeypot_data['hash'])) {
+// Cryptographically sign cookie value to prevent tampering
+function metahotels_sign_brevo_cookie($email) {
+    if (empty($email) || !is_email($email)) {
         return false;
     }
     
-    $expected_hash = wp_hash($honeypot_data['name'] . 'honeypot');
-    return hash_equals($expected_hash, $honeypot_data['hash']);
+    // Create a signed token with email and timestamp
+    $timestamp = time();
+    $data = $email . '|' . $timestamp;
+    
+    // Use WordPress's authentication key for signing
+    $secret_key = defined('AUTH_KEY') ? AUTH_KEY : wp_salt('auth');
+    $signature = hash_hmac('sha256', $data, $secret_key);
+    
+    // Return signed cookie value: email|timestamp|signature
+    return base64_encode($data . '|' . $signature);
 }
 
-function metahotels_check_rate_limit($ip_address, $limit = 5, $timeframe = 3600) {
-    $transient_key = 'brevo_rate_limit_' . md5($ip_address);
-    $attempts = get_transient($transient_key);
-    
-    if ($attempts === false) {
-        set_transient($transient_key, 1, $timeframe);
-        return true;
-    }
-    
-    if ($attempts >= $limit) {
+// Verify and extract email from signed cookie
+function metahotels_verify_brevo_cookie($signed_value) {
+    if (empty($signed_value)) {
         return false;
     }
     
-    set_transient($transient_key, $attempts + 1, $timeframe);
-    return true;
-}
-
-function metahotels_validate_submission_time($min_time = 3, $max_time = 300) {
-    if (!isset($_POST['form_start_time'])) {
+    // Decode the base64 value
+    $decoded = base64_decode($signed_value, true);
+    if ($decoded === false) {
         return false;
     }
     
-    $start_time = intval($_POST['form_start_time']);
-    $current_time = time();
-    $submission_time = $current_time - $start_time;
-    
-    // Too fast (likely a bot)
-    if ($submission_time < $min_time) {
+    // Split into parts: email|timestamp|signature
+    $parts = explode('|', $decoded);
+    if (count($parts) !== 3) {
         return false;
     }
     
-    // Too slow (session expired)
-    if ($submission_time > $max_time) {
+    list($email, $timestamp, $signature) = $parts;
+    
+    // Validate email format
+    if (!is_email($email)) {
         return false;
     }
     
-    return true;
+    // Validate timestamp (cookie should not be older than 30 days)
+    $timestamp = intval($timestamp);
+    $max_age = 30 * 24 * 60 * 60; // 30 days in seconds
+    if ($timestamp < (time() - $max_age) || $timestamp > time()) {
+        return false; // Cookie expired or invalid timestamp
+    }
+    
+    // Recreate the data and verify signature
+    $data = $email . '|' . $timestamp;
+    $secret_key = defined('AUTH_KEY') ? AUTH_KEY : wp_salt('auth');
+    $expected_signature = hash_hmac('sha256', $data, $secret_key);
+    
+    // Use hash_equals for timing-safe comparison
+    if (!hash_equals($expected_signature, $signature)) {
+        return false; // Signature verification failed
+    }
+    
+    return sanitize_email($email);
 }
-
-function metahotels_check_user_agent() {
-    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    
-    // Check for common bot user agents
-    $bot_patterns = array(
-        '/bot/i', '/crawler/i', '/spider/i', '/scraper/i',
-        '/curl/i', '/wget/i', '/python/i', '/java/i',
-        '/perl/i', '/ruby/i', '/php/i', '/go-http-client/i'
-    );
-    
-    foreach ($bot_patterns as $pattern) {
-        if (preg_match($pattern, $user_agent)) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-function metahotels_validate_referer() {
-    $referer = $_SERVER['HTTP_REFERER'] ?? '';
-    $site_url = get_site_url();
-    
-    // Check if referer is from the same site
-    if (empty($referer) || !strpos($referer, $site_url) === 0) {
-        return false;
-    }
-    
-    return true;
-}
-
-function metahotels_generate_csrf_token() {
-    $token = wp_generate_password(32, false);
-    $token_id = 'brevo_csrf_' . wp_rand(1000, 9999);
-    
-    // Store token in WordPress transients instead of sessions
-    set_transient($token_id, $token, 3600); // 1 hour expiry
-    
-    return array(
-        'token' => $token,
-        'id' => $token_id
-    );
-}
-
-function metahotels_verify_csrf_token($token_data) {
-    if (empty($token_data) || !is_array($token_data) || empty($token_data['token']) || empty($token_data['id'])) {
-        return false;
-    }
-    
-    $stored_token = get_transient($token_data['id']);
-    
-    if ($stored_token === false) {
-        return false; // Token expired or doesn't exist
-    }
-    
-    $is_valid = hash_equals($stored_token, $token_data['token']);
-    
-    // Delete the token after verification (one-time use)
-    if ($is_valid) {
-        delete_transient($token_data['id']);
-    }
-    
-    return $is_valid;
-} 
 
 // Delete user from Brevo by email
 function metahotels_delete_brevo_user($email) {
@@ -734,9 +727,10 @@ function metahotels_handle_booking_page_visit() {
     if (is_page('my-booking') || strpos($_SERVER['REQUEST_URI'], '/my-booking/') !== false) {
         // Check if user has a Brevo session (from popup registration)
         if (isset($_COOKIE['brevo_registered_email'])) {
-            $email = sanitize_email($_COOKIE['brevo_registered_email']);
+            // Verify and extract email from cryptographically signed cookie
+            $email = metahotels_verify_brevo_cookie($_COOKIE['brevo_registered_email']);
             
-            if (is_email($email)) {
+            if ($email !== false) {
                 // Delete user from Brevo
                 $deleted = metahotels_delete_brevo_user($email);
                 
@@ -745,6 +739,10 @@ function metahotels_handle_booking_page_visit() {
                     setcookie('brevo_registered_email', '', time() - 3600, '/');
                     error_log('Brevo User Deletion: User deleted from Brevo after booking - ' . $email);
                 }
+            } else {
+                // Invalid or tampered cookie - clear it
+                setcookie('brevo_registered_email', '', time() - 3600, '/');
+                error_log('Brevo User Deletion: Invalid or tampered cookie detected');
             }
         }
     }
