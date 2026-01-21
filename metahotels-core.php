@@ -3,7 +3,7 @@
 Plugin Name: MetaHotels - Core
 Plugin URI: https://www.jyothisjoy.com
 Description: MetaHotels - Core is a powerful WordPress plugin designed to showcase the various details of hotels. Includes a [countdown_timer_25h] shortcode that displays a live 25-hour countdown timer, resetting every 25 hours from a fixed reference point. Use this shortcode in posts, pages, or templates to show a dynamic countdown for special offers, events, or other time-based features. Also includes Brevo integration for email marketing and WhatsApp communication.
-Version: 2.8.9.4
+Version: 2.9.0
 Author: Jyothis Joy
 Author URI: https://www.jyothisjoy.com
 License: GPLv2 or later
