@@ -17,6 +17,15 @@ function metahotels_core_admin_menu() {
 }
 add_action('admin_menu', 'metahotels_core_admin_menu');
 
+// Enqueue admin styles
+function metahotels_enqueue_admin_scripts($hook) {
+    if ('settings_page_metahotels-settings' !== $hook) {
+        return;
+    }
+    wp_enqueue_style('metahotels-admin-style', plugins_url('../assets/admin-style.css', __FILE__), array(), '1.0.0');
+}
+add_action('admin_enqueue_scripts', 'metahotels_enqueue_admin_scripts');
+
 // Register settings
 function metahotels_core_register_settings() {
     // Register post type enable/disable settings (default: all enabled)
@@ -72,167 +81,170 @@ function metahotels_core_settings_page() {
     if (!current_user_can('manage_options')) {
         return;
     }
-
+    
     // Show success message if settings were just saved
     if (isset($_GET['settings-updated'])) {
         echo '<div class="notice notice-success is-dismissible"><p>Settings saved successfully!</p></div>';
     }
-
-    // Get post type enable/disable settings
-    $post_types_enabled = array(
-        'hotels' => get_option('metahotels_enable_hotels', true),
-        'hotel_rooms' => get_option('metahotels_enable_hotel_rooms', true),
-        'hotel_surroundings' => get_option('metahotels_enable_hotel_surroundings', true),
-        'facilities' => get_option('metahotels_enable_facilities', true),
-        'offers' => get_option('metahotels_enable_offers', true),
-        'careers' => get_option('metahotels_enable_careers', true),
-        'destinations' => get_option('metahotels_enable_destinations', true)
+    
+    // Define post types for easier iteration
+    $post_types_map = array(
+        'hotels' => 'Hotels',
+        'hotel_rooms' => 'Hotel Rooms',
+        'hotel_surroundings' => 'Hotel Surroundings',
+        'facilities' => 'Facilities',
+        'offers' => 'Offers',
+        'careers' => 'Careers',
+        'destinations' => 'Destinations'
     );
-    
-    // Get comment disabling setting
-    $disable_comments = get_option('metahotels_disable_comments', false);
-    
     ?>
-    <div class="wrap">
+    <div class="wrap metahotels-settings-wrap">
         <h1>MetaHotels Core Settings</h1>
         
-        <form method="post" action="options.php">
-            <?php settings_fields('metahotels_core_options'); ?>
+        <!-- Navigation Tabs -->
+        <div class="metahotels-tabs">
+            <button type="button" class="metahotels-tab active" data-tab="general">General Settings</button>
+            <button type="button" class="metahotels-tab" data-tab="marketing">Marketing Settings</button>
+        </div>
+
+        <!-- General Settings Tab Content -->
+        <div id="tab-general" class="metahotels-tab-content active">
+            <?php
+            // Get post type enable/disable settings
+            $post_types_enabled = array(
+                'hotels' => get_option('metahotels_enable_hotels', true),
+                'hotel_rooms' => get_option('metahotels_enable_hotel_rooms', true),
+                'hotel_surroundings' => get_option('metahotels_enable_hotel_surroundings', true),
+                'facilities' => get_option('metahotels_enable_facilities', true),
+                'offers' => get_option('metahotels_enable_offers', true),
+                'careers' => get_option('metahotels_enable_careers', true),
+                'destinations' => get_option('metahotels_enable_destinations', true)
+            );
             
-            <h2>Post Type Management</h2>
-            <p>Enable or disable post types created by this plugin. Disabling a post type will hide it from the admin menu, but existing posts will remain in the database.</p>
+            // Get comment disabling setting
+            $disable_comments = get_option('metahotels_disable_comments', false);
+            ?>
             
-            <table class="form-table" role="presentation">
-                <tbody>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_hotels">Enable Hotels</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_hotels" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_hotels" 
-                                   name="metahotels_enable_hotels" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['hotels'], true); ?> />
-                            <p class="description">Show the Hotels post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_hotel_rooms">Enable Hotel Rooms</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_hotel_rooms" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_hotel_rooms" 
-                                   name="metahotels_enable_hotel_rooms" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['hotel_rooms'], true); ?> />
-                            <p class="description">Show the Hotel Rooms post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_hotel_surroundings">Enable Hotel Surroundings</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_hotel_surroundings" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_hotel_surroundings" 
-                                   name="metahotels_enable_hotel_surroundings" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['hotel_surroundings'], true); ?> />
-                            <p class="description">Show the Hotel Surroundings post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_facilities">Enable Facilities</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_facilities" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_facilities" 
-                                   name="metahotels_enable_facilities" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['facilities'], true); ?> />
-                            <p class="description">Show the Facilities post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_offers">Enable Offers</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_offers" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_offers" 
-                                   name="metahotels_enable_offers" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['offers'], true); ?> />
-                            <p class="description">Show the Offers post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_careers">Enable Careers</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_careers" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_careers" 
-                                   name="metahotels_enable_careers" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['careers'], true); ?> />
-                            <p class="description">Show the Careers post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_enable_destinations">Enable Destinations</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_enable_destinations" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_enable_destinations" 
-                                   name="metahotels_enable_destinations" 
-                                   value="1" 
-                                   <?php checked($post_types_enabled['destinations'], true); ?> />
-                            <p class="description">Show the Destinations post type in the admin menu.</p>
-                        </td>
-                    </tr>
-                </tbody>
+            <form method="post" action="options.php">
+                <?php settings_fields('metahotels_core_options'); ?>
+                
+                <div class="metahotels-section">
+                    <div class="metahotels-card">
+                        <div class="metahotels-card-header">
+                            <h3 class="metahotels-card-title">Post Type Management</h3>
+                            <p class="metahotels-card-description">Enable or disable post types created by this plugin. Disabling a post type will hide it from the admin menu.</p>
+                        </div>
+                        <div class="metahotels-card-content">
+                            <div class="metahotels-grid">
+                            <?php foreach ($post_types_map as $key => $label): 
+                                $option_name = 'metahotels_enable_' . $key;
+                                $is_enabled = get_option($option_name, true);
+                            ?>
+                                <div class="metahotels-switch-wrapper">
+                                    <div class="metahotels-switch-label">
+                                        <span class="metahotels-switch-title"><?php echo esc_html($label); ?></span>
+                                        <span class="metahotels-switch-desc"><?php echo $is_enabled ? 'Active' : 'Disabled'; ?></span>
+                                    </div>
+                                    <label class="metahotels-switch">
+                                        <input type="hidden" name="<?php echo esc_attr($option_name); ?>" value="0" />
+                                        <input type="checkbox" 
+                                               name="<?php echo esc_attr($option_name); ?>" 
+                                               value="1" 
+                                               <?php checked($is_enabled, true); ?> />
+                                        <span class="metahotels-slider"></span>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metahotels-card">
+                        <div class="metahotels-card-header">
+                            <h3 class="metahotels-card-title">Site Comments</h3>
+                            <p class="metahotels-card-description">Manage comment settings across the entire site.</p>
+                        </div>
+                        <div class="metahotels-card-content">
+                            <?php $disable_comments = get_option('metahotels_disable_comments', false); ?>
+                            <div class="metahotels-switch-wrapper">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">Disable All Comments</span>
+                                    <span class="metahotels-switch-desc">This will remove comment support from all post types and hide comment UI.</span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="hidden" name="metahotels_disable_comments" value="0" />
+                                    <input type="checkbox" 
+                                           name="metahotels_disable_comments" 
+                                           value="1" 
+                                           <?php checked($disable_comments, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <?php submit_button(); ?>
+            </form>
             
-            <h2>Site Comments</h2>
-            <p>Disable comments across the entire site. This will remove comment support from all post types, close comments on existing posts, and hide comment-related UI elements.</p>
-            
-            <table class="form-table" role="presentation">
-                <tbody>
-                    <tr>
-                        <th scope="row">
-                            <label for="metahotels_disable_comments">Disable Comments</label>
-                        </th>
-                        <td>
-                            <input type="hidden" name="metahotels_disable_comments" value="0" />
-                            <input type="checkbox" 
-                                   id="metahotels_disable_comments" 
-                                   name="metahotels_disable_comments" 
-                                   value="1" 
-                                   <?php checked($disable_comments, true); ?> />
-                            <p class="description">Disable comments site-wide. This will remove comment functionality from all post types and hide comment-related features in the admin.</p>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            
-            <?php submit_button(); ?>
-        </form>
-        
-        <div class="notice notice-info" style="margin-top: 20px;">
-            <p><strong>Note:</strong> After changing these settings, you may need to refresh your permalink structure by going to <a href="<?php echo admin_url('options-permalink.php'); ?>">Settings → Permalinks</a> and clicking "Save Changes".</p>
+            <div class="notice notice-info" style="margin-top: 20px;">
+                <p><strong>Note:</strong> After changing these settings, you may need to refresh your permalink structure by going to <a href="<?php echo admin_url('options-permalink.php'); ?>">Settings → Permalinks</a> and clicking "Save Changes".</p>
+            </div>
+        </div>
+
+        <!-- Marketing Settings Tab Content -->
+        <div id="tab-marketing" class="metahotels-tab-content">
+             <?php 
+            if (function_exists('metahotels_brevo_render_content')) {
+                metahotels_brevo_render_content();
+            } else {
+                echo '<div class="metahotels-card"><div class="metahotels-card-content"><p>Marketing settings are not available.</p></div></div>';
+            }
+            ?>
         </div>
     </div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Simple tab switching logic
+        const settingsWrap = document.querySelector('.metahotels-settings-wrap');
+        const tabs = settingsWrap.querySelectorAll('.metahotels-tab');
+        const contents = settingsWrap.querySelectorAll('.metahotels-tab-content');
+        
+        // Restore active tab from localStorage
+        const savedTab = localStorage.getItem('metahotels_active_tab');
+        if (savedTab) {
+            const activeTabBtn = settingsWrap.querySelector(`.metahotels-tab[data-tab="${savedTab}"]`);
+            if (activeTabBtn) {
+                switchTab(savedTab);
+            }
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tabId = this.getAttribute('data-tab');
+                switchTab(tabId);
+                localStorage.setItem('metahotels_active_tab', tabId);
+            });
+        });
+
+        function switchTab(tabId) {
+            // Deactivate all
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            
+            // Activate selected
+            const selectedTab = settingsWrap.querySelector(`.metahotels-tab[data-tab="${tabId}"]`);
+            const selectedContent = document.getElementById('tab-' + tabId);
+            
+            if (selectedTab && selectedContent) {
+                selectedTab.classList.add('active');
+                selectedContent.classList.add('active');
+            }
+        }
+    });
+    </script>
     <?php
 }
 
@@ -377,4 +389,3 @@ function metahotels_disable_comments_rest_api($endpoints) {
     return $endpoints;
 }
 add_filter('rest_endpoints', 'metahotels_disable_comments_rest_api');
-

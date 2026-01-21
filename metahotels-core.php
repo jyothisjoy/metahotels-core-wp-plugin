@@ -30,6 +30,18 @@ include ('lib/functions/post-type-icons.php');
 include ('lib/functions/brevo-settings.php');
 include ('lib/functions/plugin-settings.php');
 
+// Plugin Update Checker
+$puc_path = plugin_dir_path(__FILE__) . 'lib/plugin-update-checker/plugin-update-checker.php';
+if (file_exists($puc_path)) {
+    require $puc_path;
+    $myUpdateChecker = YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+        'https://github.com/jyothisjoy/metahotels-core-wp-plugin',
+        __FILE__,
+        'metahotels-core'
+    );
+}
+
+
 
 // Shortcut Includes
 include ('lib/shortcodes/rooms-shortcode.php');

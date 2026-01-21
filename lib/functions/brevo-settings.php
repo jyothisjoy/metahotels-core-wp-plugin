@@ -5,17 +5,17 @@ if (!defined('ABSPATH')) {
 }
 
 // Add admin menu
-function metahotels_brevo_admin_menu() {
-    add_submenu_page(
-        'options-general.php',
-        'Brevo Settings',
-        'Brevo Settings',
-        'manage_options',
-        'metahotels-brevo-settings',
-        'metahotels_brevo_settings_page'
-    );
-}
-add_action('admin_menu', 'metahotels_brevo_admin_menu');
+// function metahotels_brevo_admin_menu() {
+//    add_submenu_page(
+//        'options-general.php',
+//        'Brevo Settings',
+//        'Brevo Settings',
+//        'manage_options',
+//        'metahotels-brevo-settings',
+//        'metahotels_brevo_settings_page'
+//    );
+// }
+// add_action('admin_menu', 'metahotels_brevo_admin_menu');
 
 // Register settings
 function metahotels_brevo_register_settings() {
@@ -45,7 +45,8 @@ function metahotels_brevo_register_settings() {
 add_action('admin_init', 'metahotels_brevo_register_settings');
 
 // Settings page HTML
-function metahotels_brevo_settings_page() {
+// Settings page HTML
+function metahotels_brevo_render_content() {
     $api_key = get_option('metahotels_brevo_api_key', '');
     $recaptcha_site_key = get_option('metahotels_brevo_recaptcha_site_key', '');
     $recaptcha_secret_key = get_option('metahotels_brevo_recaptcha_secret_key', '');
@@ -118,150 +119,165 @@ function metahotels_brevo_settings_page() {
     }
     
     ?>
-    <div class="wrap">
-        <h1>Brevo Settings</h1>
         <form method="post" action="">
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_api_key">Brevo API Key</label>
-                    </th>
-                    <td>
-                        <input type="text" 
-                               id="metahotels_brevo_api_key" 
-                               name="metahotels_brevo_api_key" 
-                               value="<?php echo esc_attr($api_key); ?>" 
-                               class="regular-text"
-                               required />
-                        <p class="description">Enter your Brevo API key to enable list management.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_ipapi_api_key">ipapi.com API Key</label>
-                    </th>
-                    <td>
-                        <input type="text" 
-                               id="metahotels_ipapi_api_key" 
-                               name="metahotels_ipapi_api_key" 
-                               value="<?php echo esc_attr($ipapi_api_key); ?>" 
-                               class="regular-text" />
-                        <p class="description">Enter your ipapi.com API key for automatic country code detection. Get your free API key from <a href="https://ipapi.com/signup/" target="_blank">ipapi.com</a>. This enables automatic detection of the user's country calling code based on their IP address.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_recaptcha_site_key">reCAPTCHA v3 Site Key</label>
-                    </th>
-                    <td>
-                        <input type="text"
-                               id="metahotels_brevo_recaptcha_site_key"
-                               name="metahotels_brevo_recaptcha_site_key"
-                               value="<?php echo esc_attr($recaptcha_site_key); ?>"
-                               class="regular-text" />
-                        <p class="description">Enter your Google reCAPTCHA v3 <strong>Site Key</strong>. Leave empty to disable reCAPTCHA protection on the Brevo form.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_recaptcha_secret_key">reCAPTCHA v3 Secret Key</label>
-                    </th>
-                    <td>
-                        <input type="password"
-                               id="metahotels_brevo_recaptcha_secret_key"
-                               name="metahotels_brevo_recaptcha_secret_key"
-                               value="<?php echo esc_attr($recaptcha_secret_key); ?>"
-                               class="regular-text" autocomplete="off" />
-                        <p class="description">Enter your Google reCAPTCHA v3 <strong>Secret Key</strong>. This is used on the server to verify scores.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_recaptcha_score_threshold">reCAPTCHA v3 Sensitivity (0 – 1)</label>
-                    </th>
-                    <td>
-                        <input type="number"
-                               step="0.1"
-                               min="0"
-                               max="1"
-                               id="metahotels_brevo_recaptcha_score_threshold"
-                               name="metahotels_brevo_recaptcha_score_threshold"
-                               value="<?php echo esc_attr($recaptcha_score_threshold); ?>"
-                               class="small-text" />
-                        <p class="description">Minimum reCAPTCHA v3 score required to accept a submission. <strong>Higher values are more strict</strong> (default: 0.5).</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_default_country">Default Country for Phone Numbers</label>
-                    </th>
-                    <td>
-                        <input type="text" 
-                               id="metahotels_brevo_default_country" 
-                               name="metahotels_brevo_default_country" 
-                               value="<?php echo esc_attr($default_country); ?>" 
-                               class="regular-text"
-                               required />
-                        <p class="description">Enter the default country code (e.g., +1 for USA, +91 for India) for phone numbers in subscription forms. Users can manually change this code if needed.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_advanced_validation">Enable Advanced WhatsApp Validation</label>
-                    </th>
-                    <td>
-                        <input type="checkbox" 
-                               id="metahotels_brevo_advanced_validation" 
-                               name="metahotels_brevo_advanced_validation" 
-                               value="1" 
-                               <?php checked($advanced_validation, true); ?> />
-                        <p class="description">Enable this option to use advanced validation for WhatsApp numbers.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="metahotels_brevo_debug_mode">Enable Debug Mode</label>
-                    </th>
-                    <td>
-                        <input type="hidden" name="metahotels_brevo_debug_mode" value="0" />
-                        <input type="checkbox" 
-                               id="metahotels_brevo_debug_mode" 
-                               name="metahotels_brevo_debug_mode" 
-                               value="1" 
-                               <?php checked($debug_mode, true); ?> />
-                        <p class="description">Enable this to see detailed error messages and debug information in the browser console. Open your browser's developer tools (F12) and check the Console tab when testing the form.</p>
-                        <?php if ($debug_mode): ?>
-                        <p style="color: green; font-weight: bold;">✓ Debug mode is currently ENABLED. Open browser console (F12) to view detailed logs.</p>
-                        <?php else: ?>
-                        <p style="color: #666;">Debug mode is currently disabled. Enable it to see detailed logs in the browser console.</p>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            </table>
+            <div class="metahotels-section">
+                <!-- API Configuration Card -->
+                <div class="metahotels-card">
+                    <div class="metahotels-card-header">
+                        <h3 class="metahotels-card-title">API Configuration</h3>
+                        <p class="metahotels-card-description">Configure connections to external services like Brevo and ipapi.com.</p>
+                    </div>
+                    <div class="metahotels-card-content">
+                        <div class="metahotels-form-group">
+                            <label class="metahotels-label" for="metahotels_brevo_api_key">Brevo API Key</label>
+                            <input type="text" 
+                                   id="metahotels_brevo_api_key" 
+                                   name="metahotels_brevo_api_key" 
+                                   value="<?php echo esc_attr($api_key); ?>" 
+                                   class="metahotels-input"
+                                   required />
+                            <p class="metahotels-helper-text">Enter your Brevo API key to enable list management.</p>
+                        </div>
+
+                        <div class="metahotels-form-group">
+                            <label class="metahotels-label" for="metahotels_ipapi_api_key">ipapi.com API Key</label>
+                            <input type="text" 
+                                   id="metahotels_ipapi_api_key" 
+                                   name="metahotels_ipapi_api_key" 
+                                   value="<?php echo esc_attr($ipapi_api_key); ?>" 
+                                   class="metahotels-input" />
+                            <p class="metahotels-helper-text">Get your free API key from <a href="https://ipapi.com/signup/" target="_blank">ipapi.com</a> for automatic country detection.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Settings Card -->
+                <div class="metahotels-card">
+                    <div class="metahotels-card-header">
+                        <h3 class="metahotels-card-title">Security Settings (reCAPTCHA v3)</h3>
+                        <p class="metahotels-card-description">Protect your forms from spam and bots.</p>
+                    </div>
+                    <div class="metahotels-card-content">
+                        <div class="metahotels-grid">
+                            <div class="metahotels-form-group">
+                                <label class="metahotels-label" for="metahotels_brevo_recaptcha_site_key">Site Key</label>
+                                <input type="text"
+                                       id="metahotels_brevo_recaptcha_site_key"
+                                       name="metahotels_brevo_recaptcha_site_key"
+                                       value="<?php echo esc_attr($recaptcha_site_key); ?>"
+                                       class="metahotels-input" />
+                            </div>
+                            <div class="metahotels-form-group">
+                                <label class="metahotels-label" for="metahotels_brevo_recaptcha_secret_key">Secret Key</label>
+                                <input type="password"
+                                       id="metahotels_brevo_recaptcha_secret_key"
+                                       name="metahotels_brevo_recaptcha_secret_key"
+                                       value="<?php echo esc_attr($recaptcha_secret_key); ?>"
+                                       class="metahotels-input" autocomplete="off" />
+                            </div>
+                        </div>
+                        <div class="metahotels-form-group" style="margin-top: 1rem;">
+                            <label class="metahotels-label" for="metahotels_brevo_recaptcha_score_threshold">Score Threshold (0.0 - 1.0)</label>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <input type="number"
+                                       step="0.1"
+                                       min="0"
+                                       max="1"
+                                       id="metahotels_brevo_recaptcha_score_threshold"
+                                       name="metahotels_brevo_recaptcha_score_threshold"
+                                       value="<?php echo esc_attr($recaptcha_score_threshold); ?>"
+                                       class="metahotels-input" 
+                                       style="width: 100px;" />
+                                <span class="metahotels-helper-text" style="margin: 0;">Higher values are stricter (Default: 0.5)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Preferences Card -->
+                <div class="metahotels-card">
+                    <div class="metahotels-card-header">
+                        <h3 class="metahotels-card-title">Form Preferences</h3>
+                        <p class="metahotels-card-description">Customize the behavior of your subscription forms.</p>
+                    </div>
+                    <div class="metahotels-card-content">
+                        <div class="metahotels-form-group">
+                            <label class="metahotels-label" for="metahotels_brevo_default_country">Default Country Code</label>
+                            <input type="text" 
+                                   id="metahotels_brevo_default_country" 
+                                   name="metahotels_brevo_default_country" 
+                                   value="<?php echo esc_attr($default_country); ?>" 
+                                   class="metahotels-input"
+                                   style="max-width: 200px;"
+                                   required />
+                            <p class="metahotels-helper-text">E.g., +1 for USA, +91 for India.</p>
+                        </div>
+
+                        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                            <div class="metahotels-switch-wrapper">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">Advanced WhatsApp Validation</span>
+                                    <span class="metahotels-switch-desc">Enable stricter validation rules for WhatsApp numbers.</span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="checkbox" 
+                                           name="metahotels_brevo_advanced_validation" 
+                                           value="1" 
+                                           <?php checked($advanced_validation, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+                            
+                            <div class="metahotels-switch-wrapper">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">Debug Mode</span>
+                                    <span class="metahotels-switch-desc">Log detailed errors to the browser console for troubleshooting.</span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="checkbox" 
+                                           name="metahotels_brevo_debug_mode" 
+                                           value="1" 
+                                           <?php checked($debug_mode, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <?php if (!empty($lists)): ?>
-            <h2>Available Lists</h2>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th>List Name</th>
-                        <th>List ID</th>
-                        <th>Subscribers</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($lists as $list): ?>
-                    <tr>
-                        <td><?php echo esc_html($list['name']); ?></td>
-                        <td><?php echo esc_html($list['id']); ?></td>
-                        <td><?php echo esc_html($list['subscribers']); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <div class="metahotels-card">
+                 <div class="metahotels-card-header">
+                    <h3 class="metahotels-card-title">Available Brevo Lists</h3>
+                    <p class="metahotels-card-description">Lists fetched from your Brevo account.</p>
+                </div>
+                <div class="metahotels-card-content" style="padding: 0;">
+                    <table class="wp-list-table widefat fixed striped" style="border: none; box-shadow: none;">
+                        <thead>
+                            <tr>
+                                <th style="padding: 1rem;">List Name</th>
+                                <th style="padding: 1rem;">List ID</th>
+                                <th style="padding: 1rem;">Subscribers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($lists as $list): ?>
+                            <tr>
+                                <td style="padding: 1rem;"><?php echo esc_html($list['name']); ?></td>
+                                <td style="padding: 1rem;"><?php echo esc_html($list['id']); ?></td>
+                                <td style="padding: 1rem;"><?php echo esc_html($list['subscribers']); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             <?php endif; ?>
             
-            <?php submit_button('Save API Key & Fetch Lists'); ?>
+            <div style="margin-top: 2rem;">
+                 <?php submit_button('Save Settings'); ?>
+            </div>
         </form>
         
         <h2>Shortcode Usage</h2>
