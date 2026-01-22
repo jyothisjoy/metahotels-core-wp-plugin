@@ -60,6 +60,12 @@ function metahotels_brevo_form_shortcode($atts) {
         $output .= '<input type="hidden" name="redirect_url" value="' . esc_attr($redirect_url) . '">';
         $output .= '<input type="hidden" name="nonce" value="' . wp_create_nonce('metahotels_brevo_nonce') . '">';
         
+        // Honeypot field (hidden from users, visible to bots)
+        $output .= '<div style="position: absolute; left: -5000px; top: -5000px; opacity: 0; pointer-events: none;">';
+        $output .= '<label for="website_url_' . $form_id . '">Website</label>';
+        $output .= '<input type="text" name="website_url" id="website_url_' . $form_id . '" tabindex="-1" autocomplete="off">';
+        $output .= '</div>';
+        
         // Email field
         $output .= '<div>';
         $output .= '<input type="email" name="email" id="email_' . $form_id . '" placeholder="Email Address *" required>';
@@ -249,6 +255,8 @@ function metahotels_brevo_form_scripts() {
             var $container = $('.brevo-form-container').first();
             var debugMode = $container.length > 0 && ($container.data('debug-mode') === 1 || $container.data('debug-mode') === '1');
             
+            var nonce = $container.find('input[name="nonce"]').val();
+            
             if (debugMode) {
                 console.log('MetaHotels Brevo: Loading country code from IP...');
             }
@@ -258,7 +266,8 @@ function metahotels_brevo_form_scripts() {
                 url: '<?php echo admin_url('admin-ajax.php'); ?>',
                 type: 'POST',
                 data: {
-                    action: 'metahotels_brevo_get_country_code'
+                    action: 'metahotels_brevo_get_country_code',
+                    nonce: nonce
                 },
                 dataType: 'json',
                 timeout: 10000 // 10 second timeout
@@ -722,6 +731,12 @@ add_action('wp_ajax_metahotels_brevo_get_country_code', 'metahotels_brevo_get_co
 add_action('wp_ajax_nopriv_metahotels_brevo_get_country_code', 'metahotels_brevo_get_country_code_handler');
 
 function metahotels_brevo_get_country_code_handler() {
+    // Verify nonce
+    if (!check_ajax_referer('metahotels_brevo_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Security check failed'));
+        return;
+    }
+
     // Get debug mode setting
     $debug_mode = get_option('metahotels_brevo_debug_mode', false);
     
@@ -1008,6 +1023,23 @@ function metahotels_brevo_subscribe_handler() {
                 wp_send_json_error($response);
             } else {
                 wp_die('Security check failed');
+            }
+        }
+        
+        // Check Honeypot
+        if (!empty($_POST['website_url'])) {
+            if ($debug_mode) {
+                $debug_data['error'] = 'Bot detected: Honeypot field filled';
+            }
+            // Fail silently or with generic error to confuse bots
+            if (wp_doing_ajax()) {
+                $response = array('message' => 'Submission failed'); // Generic error
+                if ($debug_mode) {
+                    $response['debug'] = $debug_data;
+                }
+                wp_send_json_error($response);
+            } else {
+                wp_die('Submission failed');
             }
         }
         

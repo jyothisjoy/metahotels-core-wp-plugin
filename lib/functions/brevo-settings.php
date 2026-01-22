@@ -32,9 +32,7 @@ function metahotels_brevo_register_settings() {
     register_setting('metahotels_brevo_options', 'metahotels_brevo_default_country', array(
         'default' => 'IN'
     ));
-    register_setting('metahotels_brevo_options', 'metahotels_brevo_advanced_validation', array(
-        'default' => false
-    ));
+
     register_setting('metahotels_brevo_options', 'metahotels_brevo_debug_mode', array(
         'default' => false
     ));
@@ -53,7 +51,7 @@ function metahotels_brevo_render_content() {
     $recaptcha_score_threshold = get_option('metahotels_brevo_recaptcha_score_threshold', 0.5);
     $lists = get_option('metahotels_brevo_lists', array());
     $default_country = get_option('metahotels_brevo_default_country', 'IN');
-    $advanced_validation = get_option('metahotels_brevo_advanced_validation', false);
+
     $debug_mode = get_option('metahotels_brevo_debug_mode', false);
     $ipapi_api_key = get_option('metahotels_ipapi_api_key', '');
     
@@ -70,7 +68,7 @@ function metahotels_brevo_render_content() {
             $new_recaptcha_score_threshold = 1;
         }
         $new_default_country = isset($_POST['metahotels_brevo_default_country']) ? sanitize_text_field($_POST['metahotels_brevo_default_country']) : $default_country;
-        $new_advanced_validation = isset($_POST['metahotels_brevo_advanced_validation']) && $_POST['metahotels_brevo_advanced_validation'] == '1' ? true : false;
+
         $new_debug_mode = isset($_POST['metahotels_brevo_debug_mode']) && $_POST['metahotels_brevo_debug_mode'] == '1' ? true : false;
         $new_ipapi_api_key = isset($_POST['metahotels_ipapi_api_key']) ? sanitize_text_field($_POST['metahotels_ipapi_api_key']) : $ipapi_api_key;
         
@@ -80,7 +78,7 @@ function metahotels_brevo_render_content() {
         update_option('metahotels_brevo_recaptcha_site_key', $new_recaptcha_site_key);
         update_option('metahotels_brevo_recaptcha_secret_key', $new_recaptcha_secret_key);
         update_option('metahotels_brevo_recaptcha_score_threshold', $new_recaptcha_score_threshold);
-        update_option('metahotels_brevo_advanced_validation', $new_advanced_validation);
+
         update_option('metahotels_brevo_debug_mode', $new_debug_mode);
         
         // Update local variables for display
@@ -214,20 +212,7 @@ function metahotels_brevo_render_content() {
                         </div>
 
                         <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-                            <div class="metahotels-switch-wrapper">
-                                <div class="metahotels-switch-label">
-                                    <span class="metahotels-switch-title">Advanced WhatsApp Validation</span>
-                                    <span class="metahotels-switch-desc">Enable stricter validation rules for WhatsApp numbers.</span>
-                                </div>
-                                <label class="metahotels-switch">
-                                    <input type="checkbox" 
-                                           name="metahotels_brevo_advanced_validation" 
-                                           value="1" 
-                                           <?php checked($advanced_validation, true); ?> />
-                                    <span class="metahotels-slider"></span>
-                                </label>
-                            </div>
-                            
+
                             <div class="metahotels-switch-wrapper">
                                 <div class="metahotels-switch-label">
                                     <span class="metahotels-switch-title">Debug Mode</span>
@@ -767,6 +752,11 @@ add_action('wp', 'metahotels_handle_booking_page_visit');
 
 // Simple test function for debugging
 function metahotels_brevo_test_ajax() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Unauthorized'));
+        return;
+    }
+
     if (isset($_POST['test_ajax']) && $_POST['test_ajax'] === 'test') {
         wp_send_json_success(array('message' => 'AJAX is working!', 'timestamp' => time()));
     }

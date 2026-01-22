@@ -63,7 +63,7 @@ function render_hotel_selection_meta_box($post) {
     echo '<option value="">Select a Hotel</option>';
     foreach ($hotels as $hotel) {
         $selected = ($hotel_id == $hotel->ID) ? 'selected' : '';
-        echo '<option value="' . $hotel->ID . '" ' . $selected . '>' . $hotel->post_title . '</option>';
+        echo '<option value="' . $hotel->ID . '" ' . $selected . '>' . esc_html($hotel->post_title) . '</option>';
     }
     echo '</select></p>';
 }
