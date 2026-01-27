@@ -36,7 +36,9 @@ function metahotels_core_register_settings() {
         'facilities' => 'Facilities',
         'offers' => 'Offers',
         'careers' => 'Careers',
-        'destinations' => 'Destinations'
+        'destinations' => 'Destinations',
+        'restaurants' => 'Restaurants',
+        'meetings' => 'Meetings'
     );
 
     foreach ($post_types as $key => $label) {
@@ -74,6 +76,8 @@ add_action('update_option_metahotels_enable_facilities', 'metahotels_core_flush_
 add_action('update_option_metahotels_enable_offers', 'metahotels_core_flush_rewrite_rules');
 add_action('update_option_metahotels_enable_careers', 'metahotels_core_flush_rewrite_rules');
 add_action('update_option_metahotels_enable_destinations', 'metahotels_core_flush_rewrite_rules');
+add_action('update_option_metahotels_enable_restaurants', 'metahotels_core_flush_rewrite_rules');
+add_action('update_option_metahotels_enable_meetings', 'metahotels_core_flush_rewrite_rules');
 
 // Settings page HTML
 function metahotels_core_settings_page() {
@@ -95,7 +99,9 @@ function metahotels_core_settings_page() {
         'facilities' => 'Facilities',
         'offers' => 'Offers',
         'careers' => 'Careers',
-        'destinations' => 'Destinations'
+        'destinations' => 'Destinations',
+        'restaurants' => 'Restaurants',
+        'meetings' => 'Meetings'
     );
     ?>
     <div class="wrap metahotels-settings-wrap">
@@ -118,7 +124,9 @@ function metahotels_core_settings_page() {
                 'facilities' => get_option('metahotels_enable_facilities', true),
                 'offers' => get_option('metahotels_enable_offers', true),
                 'careers' => get_option('metahotels_enable_careers', true),
-                'destinations' => get_option('metahotels_enable_destinations', true)
+                'destinations' => get_option('metahotels_enable_destinations', true),
+                'restaurants' => get_option('metahotels_enable_restaurants', true),
+                'meetings' => get_option('metahotels_enable_meetings', true)
             );
             
             // Get comment disabling setting
@@ -139,10 +147,26 @@ function metahotels_core_settings_page() {
                             <?php foreach ($post_types_map as $key => $label): 
                                 $option_name = 'metahotels_enable_' . $key;
                                 $is_enabled = get_option($option_name, true);
+                                $icons = array(
+                                    'hotels' => 'dashicons-building',
+                                    'hotel_rooms' => 'dashicons-admin-home',
+                                    'hotel_surroundings' => 'dashicons-admin-site',
+                                    'facilities' => 'dashicons-admin-tools',
+                                    'offers' => 'dashicons-tag',
+                                    'careers' => 'dashicons-businessman',
+                                    'destinations' => 'dashicons-location',
+                                    'restaurants' => 'dashicons-food',
+                                    'meetings' => 'dashicons-groups'
+                                );
                             ?>
                                 <div class="metahotels-switch-wrapper">
                                     <div class="metahotels-switch-label">
-                                        <span class="metahotels-switch-title"><?php echo esc_html($label); ?></span>
+                                        <span class="metahotels-switch-title">
+                                            <?php if (isset($icons[$key])): ?>
+                                                <span class="dashicons <?php echo esc_attr($icons[$key]); ?>" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
+                                            <?php endif; ?>
+                                            <?php echo esc_html($label); ?>
+                                        </span>
                                         <span class="metahotels-switch-desc"><?php echo $is_enabled ? 'Active' : 'Disabled'; ?></span>
                                     </div>
                                     <label class="metahotels-switch">

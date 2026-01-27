@@ -25,7 +25,9 @@ function metahotels_get_post_type_icon($post_type) {
         'career' => 'dashicons-businessman',       // Business person icon for careers
         'destination' => 'dashicons-location',     // Location icon for destinations
         'facility' => 'dashicons-admin-tools',     // Tools icon for facilities
-        'hotel_surrounding' => 'dashicons-admin-site' // Site icon for surroundings
+        'hotel_surrounding' => 'dashicons-admin-site', // Site icon for surroundings
+        'restaurant' => 'dashicons-food',        // Food icon for restaurants
+        'meeting' => 'dashicons-groups'            // Groups icon for meetings
     );
     
     return isset($icons[$post_type]) ? $icons[$post_type] : 'dashicons-admin-post';
@@ -57,6 +59,12 @@ function metahotels_post_type_icons_css() {
             color: #46b450;
         }
         #adminmenu .wp-menu-image.dashicons-admin-site:before {
+            color: #46b450;
+        }
+        #adminmenu .wp-menu-image.dashicons-food:before {
+            color: #46b450;
+        }
+        #adminmenu .wp-menu-image.dashicons-groups:before {
             color: #46b450;
         }
     </style>
