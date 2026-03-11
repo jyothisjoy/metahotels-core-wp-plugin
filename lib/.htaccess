@@ -1,0 +1,13 @@
+# Deny direct browser access to all PHP files under lib/
+# WordPress loads these files via require_once from the main plugin file.
+<Files "*.php">
+    Order Deny,Allow
+    Deny from all
+</Files>
+
+# Apache 2.4+ equivalent
+<IfModule mod_authz_core.c>
+    <Files "*.php">
+        Require all denied
+    </Files>
+</IfModule>

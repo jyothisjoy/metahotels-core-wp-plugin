@@ -59,8 +59,10 @@ function metahotels_core_register_settings() {
 add_action('admin_init', 'metahotels_core_register_settings');
 
 // Sanitize boolean values
-function metahotels_sanitize_boolean($value) {
-    return (bool) $value;
+if (!function_exists('metahotels_sanitize_boolean')) {
+    function metahotels_sanitize_boolean($value) {
+        return (bool) $value;
+    }
 }
 
 // Flush rewrite rules after settings are saved
@@ -130,7 +132,7 @@ function metahotels_core_settings_page() {
             );
             
             // Get comment disabling setting
-            $disable_comments = get_option('metahotels_disable_comments', false);
+            $disable_comments = metahotels_comments_disabled();
             ?>
             
             <form method="post" action="options.php">
@@ -143,21 +145,23 @@ function metahotels_core_settings_page() {
                             <p class="metahotels-card-description">Enable or disable post types created by this plugin. Disabling a post type will hide it from the admin menu.</p>
                         </div>
                         <div class="metahotels-card-content">
-                            <div class="metahotels-grid">
-                            <?php foreach ($post_types_map as $key => $label): 
-                                $option_name = 'metahotels_enable_' . $key;
-                                $is_enabled = get_option($option_name, true);
+                            <?php
                                 $icons = array(
-                                    'hotels' => 'dashicons-building',
-                                    'hotel_rooms' => 'dashicons-admin-home',
+                                    'hotels'             => 'dashicons-building',
+                                    'hotel_rooms'        => 'dashicons-admin-home',
                                     'hotel_surroundings' => 'dashicons-admin-site',
-                                    'facilities' => 'dashicons-admin-tools',
-                                    'offers' => 'dashicons-tag',
-                                    'careers' => 'dashicons-businessman',
-                                    'destinations' => 'dashicons-location',
-                                    'restaurants' => 'dashicons-food',
-                                    'meetings' => 'dashicons-groups'
+                                    'facilities'         => 'dashicons-admin-tools',
+                                    'offers'             => 'dashicons-tag',
+                                    'careers'            => 'dashicons-businessman',
+                                    'destinations'       => 'dashicons-location',
+                                    'restaurants'        => 'dashicons-food',
+                                    'meetings'           => 'dashicons-groups',
                                 );
+                            ?>
+                            <div class="metahotels-grid">
+                            <?php foreach ($post_types_map as $key => $label):
+                                $option_name = 'metahotels_enable_' . $key;
+                                $is_enabled  = get_option($option_name, true);
                             ?>
                                 <div class="metahotels-switch-wrapper">
                                     <div class="metahotels-switch-label">
@@ -167,7 +171,7 @@ function metahotels_core_settings_page() {
                                             <?php endif; ?>
                                             <?php echo esc_html($label); ?>
                                         </span>
-                                        <span class="metahotels-switch-desc"><?php echo $is_enabled ? 'Active' : 'Disabled'; ?></span>
+                                        <span class="metahotels-switch-desc"><?php echo $is_enabled ? esc_html__('Active', 'metahotels-core') : esc_html__('Disabled', 'metahotels-core'); ?></span>
                                     </div>
                                     <label class="metahotels-switch">
                                         <input type="hidden" name="<?php echo esc_attr($option_name); ?>" value="0" />
@@ -189,7 +193,7 @@ function metahotels_core_settings_page() {
                             <p class="metahotels-card-description">Manage comment settings across the entire site.</p>
                         </div>
                         <div class="metahotels-card-content">
-                            <?php $disable_comments = get_option('metahotels_disable_comments', false); ?>
+                            <?php $disable_comments = metahotels_comments_disabled(); ?>
                             <div class="metahotels-switch-wrapper">
                                 <div class="metahotels-switch-label">
                                     <span class="metahotels-switch-title">Disable All Comments</span>
@@ -276,9 +280,21 @@ function metahotels_core_settings_page() {
 // Comment Disabling Functionality
 // ============================================
 
+/**
+ * Single cached read of the disable-comments option for this request.
+ * Avoids 8+ repeated get_option() calls across hooks.
+ */
+function metahotels_comments_disabled() {
+    static $disabled = null;
+    if ($disabled === null) {
+        $disabled = (bool) get_option('metahotels_disable_comments', false);
+    }
+    return $disabled;
+}
+
 // Remove comment support from all post types
 function metahotels_remove_comment_support() {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         $post_types = get_post_types(array('public' => true), 'names');
         foreach ($post_types as $post_type) {
             remove_post_type_support($post_type, 'comments');
@@ -290,7 +306,7 @@ add_action('init', 'metahotels_remove_comment_support', 100);
 
 // Close comments on the frontend
 function metahotels_close_comments($open, $post_id) {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         return false;
     }
     return $open;
@@ -301,7 +317,7 @@ add_filter('pings_open', 'metahotels_close_comments', 20, 2);
 // Close comments on new posts by default
 function metahotels_close_new_posts_comments($post_id, $post) {
     // Check if the option is enabled
-    if (!get_option('metahotels_disable_comments', false)) {
+    if (!metahotels_comments_disabled()) {
         return;
     }
 
@@ -334,7 +350,7 @@ add_action('wp_insert_post', 'metahotels_close_new_posts_comments', 10, 2);
 
 // Set default comment status for new posts
 function metahotels_default_comment_status($status, $post_type) {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         return 'closed';
     }
     return $status;
@@ -343,7 +359,7 @@ add_filter('get_default_comment_status', 'metahotels_default_comment_status', 10
 
 // Disable comment feeds
 function metahotels_disable_comment_feeds() {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         $feed = get_query_var('feed');
         if (in_array($feed, array('comments-rss2', 'comments-rss', 'comments-atom'))) {
             wp_die(__('Comments are disabled.', 'metahotels-core'), '', array('response' => 403));
@@ -354,7 +370,7 @@ add_action('template_redirect', 'metahotels_disable_comment_feeds', 9);
 
 // Hide comment-related admin menu items
 function metahotels_hide_comments_admin_menu() {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         remove_menu_page('edit-comments.php');
         remove_submenu_page('options-general.php', 'options-discussion.php');
     }
@@ -363,7 +379,7 @@ add_action('admin_menu', 'metahotels_hide_comments_admin_menu', 999);
 
 // Remove comment metabox from post edit screen
 function metahotels_remove_comments_meta_box() {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         $post_types = get_post_types();
         foreach ($post_types as $post_type) {
             remove_meta_box('commentstatusdiv', $post_type, 'normal');
@@ -376,7 +392,7 @@ add_action('admin_init', 'metahotels_remove_comments_meta_box');
 
 // Remove comment column from posts list
 function metahotels_remove_comments_column($columns) {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         unset($columns['comments']);
     }
     return $columns;
@@ -386,7 +402,7 @@ add_filter('manage_pages_columns', 'metahotels_remove_comments_column');
 
 // Remove comment-related dashboard widgets
 function metahotels_remove_comment_dashboard_widgets() {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         remove_meta_box('dashboard_recent_comments', 'dashboard', 'normal');
     }
 }
@@ -394,7 +410,7 @@ add_action('wp_dashboard_setup', 'metahotels_remove_comment_dashboard_widgets');
 
 // Remove comment-related admin bar items
 function metahotels_remove_comments_admin_bar($wp_admin_bar) {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         $wp_admin_bar->remove_node('comments');
     }
 }
@@ -402,7 +418,7 @@ add_action('admin_bar_menu', 'metahotels_remove_comments_admin_bar', 999);
 
 // Disable comment REST API endpoints
 function metahotels_disable_comments_rest_api($endpoints) {
-    if (get_option('metahotels_disable_comments', false)) {
+    if (metahotels_comments_disabled()) {
         if (isset($endpoints['/wp/v2/comments'])) {
             unset($endpoints['/wp/v2/comments']);
         }

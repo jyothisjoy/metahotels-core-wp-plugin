@@ -1,4 +1,8 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Add meta boxes for hotel selection in related post types
 function add_hotel_selection_meta_box() {
     // Add to hotel rooms
@@ -50,13 +54,18 @@ function render_hotel_selection_meta_box($post) {
     // Get saved hotel ID
     $hotel_id = get_post_meta($post->ID, '_selected_hotel', true);
 
-    // Get all hotels
-    $hotels = get_posts(array(
-        'post_type' => 'hotel',
-        'posts_per_page' => -1,
-        'orderby' => 'title',
-        'order' => 'ASC'
-    ));
+    // Get all hotels (cached for the duration of this request)
+    $hotels = wp_cache_get('metahotels_all_hotels', 'metahotels');
+    if ($hotels === false) {
+        $hotels = get_posts(array(
+            'post_type'      => 'hotel',
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'no_found_rows'  => true,
+        ));
+        wp_cache_set('metahotels_all_hotels', $hotels, 'metahotels', 300);
+    }
     
     echo '<p><label for="selected_hotel"><strong>Select Hotel:</strong></label><br>';
     echo '<select name="selected_hotel" id="selected_hotel" style="width: 100%;">';
@@ -92,7 +101,7 @@ function save_hotel_selection_meta_box($post_id) {
 
     // Save the hotel selection
     if (isset($_POST['selected_hotel'])) {
-        update_post_meta($post_id, '_selected_hotel', sanitize_text_field($_POST['selected_hotel']));
+        update_post_meta($post_id, '_selected_hotel', absint($_POST['selected_hotel']));
     }
 }
 add_action('save_post', 'save_hotel_selection_meta_box');

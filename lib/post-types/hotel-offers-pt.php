@@ -224,7 +224,7 @@ function save_offer_meta_box($post_id) {
         update_post_meta($post_id, '_offer_url_meta_key', esc_url_raw($_POST['offer_url_field']));
     }
     if (isset($_POST['offer_terms_field'])) {
-        update_post_meta($post_id, '_offer_terms_meta_key', sanitize_textarea_field($_POST['offer_terms_field']));
+        update_post_meta($post_id, '_offer_terms_meta_key', wp_kses_post($_POST['offer_terms_field']));
     }
     if (isset($_POST['offer_includes_field'])) {
         update_post_meta($post_id, '_offer_includes_meta_key', wp_kses_post($_POST['offer_includes_field']));

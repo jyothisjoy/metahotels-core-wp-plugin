@@ -9,9 +9,11 @@ if (!defined('ABSPATH')) {
 // Register shortcode
 add_shortcode('brevo_form', 'metahotels_brevo_form_shortcode');
 
-// Global flag to track if any Brevo form is used
+// Global flag to track if any Brevo form is used on this page
 global $metahotels_brevo_form_used;
-$metahotels_brevo_form_used = false;
+if (!isset($metahotels_brevo_form_used)) {
+    $metahotels_brevo_form_used = false;
+}
 
 function metahotels_brevo_form_shortcode($atts) {
     global $metahotels_brevo_form_used;
@@ -141,22 +143,12 @@ function metahotels_brevo_form_scripts() {
         }
     }
     
-    // Check if we're on a page that might have dynamic content (like Elementor pages)
+    // If no forms detected anywhere, bail — don't load scripts or reCAPTCHA SDK.
+    // For Elementor popup support: place the [brevo_form] shortcode somewhere on
+    // the page (e.g. a hidden section) or use a page-level template that ensures
+    // $metahotels_brevo_form_used is set before wp_footer fires.
     if (!$has_brevo_form) {
-        // Check if Elementor is active and we're on a page that might have popups
-        if (class_exists('Elementor\Plugin') && is_page()) {
-            $has_brevo_form = true; // Load script on all pages when Elementor is active
-        }
-    }
-    
-    // If no forms detected, don't load the script
-    if (!$has_brevo_form) {
-        // But if Elementor is active, load the script anyway to handle dynamic content
-        if (class_exists('Elementor\Plugin')) {
-            $has_brevo_form = true;
-        } else {
-            return;
-        }
+        return;
     }
     
     // Mark as loaded to prevent multiple executions
@@ -737,6 +729,16 @@ function metahotels_brevo_get_country_code_handler() {
         return;
     }
 
+    // Rate limiting: max 20 country-code lookups per IP per minute
+    $rate_ip  = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : 'unknown';
+    $rate_key = 'brevo_cc_rate_' . md5($rate_ip);
+    $attempts = (int) get_transient($rate_key);
+    if ($attempts >= 20) {
+        wp_send_json_error(array('message' => 'Too many requests. Please wait a moment and try again.'));
+        return;
+    }
+    set_transient($rate_key, $attempts + 1, 60);
+
     // Get debug mode setting
     $debug_mode = get_option('metahotels_brevo_debug_mode', false);
     
@@ -752,27 +754,9 @@ function metahotels_brevo_get_country_code_handler() {
         return;
     }
     
-    // Get user's IP address
-    $user_ip = '';
-    
-    // Check for IP in various headers (for proxies/load balancers)
-    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-        $user_ip = $_SERVER['HTTP_CLIENT_IP'];
-    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-        $user_ip = trim($ips[0]);
-    } elseif (!empty($_SERVER['HTTP_X_FORWARDED'])) {
-        $user_ip = $_SERVER['HTTP_X_FORWARDED'];
-    } elseif (!empty($_SERVER['HTTP_FORWARDED_FOR'])) {
-        $user_ip = $_SERVER['HTTP_FORWARDED_FOR'];
-    } elseif (!empty($_SERVER['HTTP_FORWARDED'])) {
-        $user_ip = $_SERVER['HTTP_FORWARDED'];
-    } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
-        $user_ip = $_SERVER['REMOTE_ADDR'];
-    }
-    
-    // Sanitize IP
-    $user_ip = sanitize_text_field($user_ip);
+    // Use only the real TCP connection IP — spoofable headers (HTTP_CLIENT_IP,
+    // HTTP_X_FORWARDED_FOR, etc.) are excluded because any client can forge them.
+    $user_ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '';
     
     // Validate IP format
     if (empty($user_ip) || !filter_var($user_ip, FILTER_VALIDATE_IP)) {
@@ -807,7 +791,7 @@ function metahotels_brevo_get_country_code_handler() {
     $api_url = 'https://api.ipapi.com/api/' . urlencode($user_ip) . '?access_key=' . urlencode($api_key);
     
     if ($debug_mode) {
-        error_log('IPAPI: Making API request to: ' . $api_url);
+        error_log('IPAPI: Making API request for IP: ' . $user_ip);
     }
     
     $response = wp_remote_get($api_url, array(
@@ -890,6 +874,19 @@ add_action('wp_ajax_metahotels_brevo_subscribe', 'metahotels_brevo_subscribe_han
 add_action('wp_ajax_nopriv_metahotels_brevo_subscribe', 'metahotels_brevo_subscribe_handler');
 
 function metahotels_brevo_subscribe_handler() {
+    // Rate limiting: max 5 form submissions per IP per minute
+    $rate_ip  = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : 'unknown';
+    $rate_key = 'brevo_sub_rate_' . md5($rate_ip);
+    $attempts = (int) get_transient($rate_key);
+    if ($attempts >= 5) {
+        if (wp_doing_ajax()) {
+            wp_send_json_error(array('message' => 'Too many attempts. Please wait a moment and try again.'));
+        } else {
+            wp_die('Too many attempts. Please wait a moment and try again.');
+        }
+    }
+    set_transient($rate_key, $attempts + 1, 60);
+
     // Get debug mode setting
     $debug_mode = get_option('metahotels_brevo_debug_mode', false);
     
@@ -909,9 +906,8 @@ function metahotels_brevo_subscribe_handler() {
         // Log incoming request if debug mode is enabled
         if ($debug_mode) {
             $debug_data['request_time'] = current_time('mysql');
-            $debug_data['post_data'] = $_POST;
-            // Sanitize sensitive data for response
-            $debug_data['post_data']['nonce'] = '[HIDDEN]';
+            // Log only field names to avoid exposing PII in the client-side response.
+            $debug_data['post_data_keys'] = array_keys($_POST);
         }
         
         // Verify reCAPTCHA token if secret key is configured
@@ -928,16 +924,15 @@ function metahotels_brevo_subscribe_handler() {
                     $debug_data['recaptcha']['error'] = 'Missing reCAPTCHA token';
                 }
                 if (wp_doing_ajax()) {
-                    $response = array('message' => 'Security check failed');
                     if ($debug_mode) {
-                        $response['debug'] = $debug_data;
+                        error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
                     }
-                    wp_send_json_error($response);
+                    wp_send_json_error(array('message' => 'Security check failed'));
                 } else {
                     wp_die('Security check failed');
                 }
             }
-            
+
             $remote_ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '';
             $verify_response = wp_remote_post('https://www.google.com/recaptcha/api/siteverify', array(
                 'body' => array(
@@ -957,16 +952,15 @@ function metahotels_brevo_subscribe_handler() {
                     );
                 }
                 if (wp_doing_ajax()) {
-                    $response = array('message' => 'Security check failed');
                     if ($debug_mode) {
-                        $response['debug'] = $debug_data;
+                        error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
                     }
-                    wp_send_json_error($response);
+                    wp_send_json_error(array('message' => 'Security check failed'));
                 } else {
                     wp_die('Security check failed');
                 }
             }
-            
+
             $verify_body = wp_remote_retrieve_body($verify_response);
             $verify_data = json_decode($verify_body, true);
             
@@ -992,11 +986,10 @@ function metahotels_brevo_subscribe_handler() {
                     );
                 }
                 if (wp_doing_ajax()) {
-                    $response = array('message' => 'Security check failed');
                     if ($debug_mode) {
-                        $response['debug'] = $debug_data;
+                        error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
                     }
-                    wp_send_json_error($response);
+                    wp_send_json_error(array('message' => 'Security check failed'));
                 } else {
                     wp_die('Security check failed');
                 }
@@ -1014,13 +1007,10 @@ function metahotels_brevo_subscribe_handler() {
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'metahotels_brevo_nonce')) {
             if ($debug_mode) {
                 $debug_data['error'] = 'Security check failed - Nonce verification failed';
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             if (wp_doing_ajax()) {
-                $response = array('message' => 'Security check failed');
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => 'Security check failed'));
             } else {
                 wp_die('Security check failed');
             }
@@ -1030,14 +1020,11 @@ function metahotels_brevo_subscribe_handler() {
         if (!empty($_POST['website_url'])) {
             if ($debug_mode) {
                 $debug_data['error'] = 'Bot detected: Honeypot field filled';
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             // Fail silently or with generic error to confuse bots
             if (wp_doing_ajax()) {
-                $response = array('message' => 'Submission failed'); // Generic error
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => 'Submission failed'));
             } else {
                 wp_die('Submission failed');
             }
@@ -1048,7 +1035,9 @@ function metahotels_brevo_subscribe_handler() {
         $whatsapp = isset($_POST['whatsapp']) ? sanitize_text_field($_POST['whatsapp']) : '';
         $country_code = isset($_POST['country_code']) ? sanitize_text_field($_POST['country_code']) : '';
         $list_id = isset($_POST['list_id']) ? intval($_POST['list_id']) : 0;
-        $redirect_url = isset($_POST['redirect_url']) ? sanitize_text_field($_POST['redirect_url']) : '';
+        // Validate redirect URL stays on the same site (prevents open redirect).
+        $raw_redirect   = isset($_POST['redirect_url']) ? sanitize_text_field($_POST['redirect_url']) : '';
+        $redirect_url   = $raw_redirect ? wp_validate_redirect($raw_redirect, '') : '';
         
         if ($debug_mode) {
             $debug_data['form_data'] = array(
@@ -1063,13 +1052,10 @@ function metahotels_brevo_subscribe_handler() {
             $error_message = 'Invalid email address';
             if ($debug_mode) {
                 $debug_data['error'] = 'Invalid email address: ' . $email;
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             if (wp_doing_ajax()) {
-                $response = array('message' => $error_message);
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => $error_message));
             } else {
                 wp_die($error_message);
             }
@@ -1079,29 +1065,26 @@ function metahotels_brevo_subscribe_handler() {
             $error_message = 'WhatsApp number is required';
             if ($debug_mode) {
                 $debug_data['error'] = 'WhatsApp number is required';
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             if (wp_doing_ajax()) {
-                $response = array('message' => $error_message);
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => $error_message));
             } else {
                 wp_die($error_message);
             }
         }
         
-        if (empty($list_id)) {
+        // Validate list_id against the whitelist of lists saved in options.
+        $allowed_lists = get_option('metahotels_brevo_lists', array());
+        $allowed_ids   = array_map('intval', wp_list_pluck($allowed_lists, 'id'));
+        if (empty($list_id) || !in_array($list_id, $allowed_ids, true)) {
             $error_message = 'Invalid list ID';
             if ($debug_mode) {
                 $debug_data['error'] = 'Invalid list ID: ' . $list_id;
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             if (wp_doing_ajax()) {
-                $response = array('message' => $error_message);
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => $error_message));
             } else {
                 wp_die($error_message);
             }
@@ -1113,13 +1096,10 @@ function metahotels_brevo_subscribe_handler() {
             $error_message = 'Service configuration error';
             if ($debug_mode) {
                 $debug_data['error'] = 'API key not configured';
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             if (wp_doing_ajax()) {
-                $response = array('message' => $error_message);
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => $error_message));
             } else {
                 wp_die($error_message);
             }
@@ -1201,20 +1181,16 @@ function metahotels_brevo_subscribe_handler() {
         
         if (is_wp_error($response)) {
             $error_message = 'Connection error';
-            $wp_error_message = $response->get_error_message();
             if ($debug_mode) {
                 $debug_data['api_error'] = array(
-                    'type' => 'WP_Error',
-                    'message' => $wp_error_message,
-                    'code' => $response->get_error_code()
+                    'type'    => 'WP_Error',
+                    'message' => $response->get_error_message(),
+                    'code'    => $response->get_error_code(),
                 );
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
             }
             if (wp_doing_ajax()) {
-                $response_data = array('message' => $error_message);
-                if ($debug_mode) {
-                    $response_data['debug'] = $debug_data;
-                }
-                wp_send_json_error($response_data);
+                wp_send_json_error(array('message' => $error_message));
             } else {
                 wp_die($error_message);
             }
@@ -1239,18 +1215,24 @@ function metahotels_brevo_subscribe_handler() {
                 $debug_data['status'] = 'success';
             }
             
+            if ($debug_mode) {
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
+            }
             $response_data = array('message' => 'Contact added successfully');
             if (!empty($redirect_url)) {
                 $response_data['redirect_url'] = $redirect_url;
-            }
-            if ($debug_mode) {
-                $response_data['debug'] = $debug_data;
             }
             
             // Set cryptographically signed cookie to track user for potential deletion on booking page
             $signed_cookie_value = metahotels_sign_brevo_cookie($email);
             if ($signed_cookie_value !== false) {
-                setcookie('brevo_registered_email', $signed_cookie_value, time() + (30 * 24 * 60 * 60), '/'); // 30 days
+                setcookie('brevo_registered_email', $signed_cookie_value, array(
+                    'expires'  => time() + (30 * 24 * 60 * 60),
+                    'path'     => '/',
+                    'secure'   => is_ssl(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ));
             }
             
             if (wp_doing_ajax()) {
@@ -1258,7 +1240,7 @@ function metahotels_brevo_subscribe_handler() {
             } else {
                 // For regular form submission, redirect or show success message
                 if (!empty($redirect_url)) {
-                    wp_redirect($redirect_url);
+                    wp_safe_redirect($redirect_url);
                     exit;
                 } else {
                     wp_die('Contact added successfully!');
@@ -1296,35 +1278,31 @@ function metahotels_brevo_subscribe_handler() {
                 $error_message = 'Service temporarily unavailable';
             }
             
+            if ($debug_mode) {
+                error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
+            }
             if (wp_doing_ajax()) {
-                $response = array('message' => $error_message);
-                if ($debug_mode) {
-                    $response['debug'] = $debug_data;
-                }
-                wp_send_json_error($response);
+                wp_send_json_error(array('message' => $error_message));
             } else {
                 wp_die($error_message);
             }
         }
-        
+
     } catch (Exception $e) {
         if ($debug_mode) {
             $debug_data['exception'] = array(
                 'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
+                'file'    => $e->getFile(),
+                'line'    => $e->getLine(),
+                'trace'   => $e->getTraceAsString(),
             );
+            error_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
         }
-        
+
         $error_message = 'An unexpected error occurred. Please try again.';
-        
+
         if (wp_doing_ajax()) {
-            $response = array('message' => $error_message);
-            if ($debug_mode) {
-                $response['debug'] = $debug_data;
-            }
-            wp_send_json_error($response);
+            wp_send_json_error(array('message' => $error_message));
         } else {
             wp_die($error_message);
         }

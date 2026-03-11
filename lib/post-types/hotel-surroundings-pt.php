@@ -156,22 +156,33 @@ function save_hotel_surroundings_meta_box($post_id) {
         return;
     }
 
-    // Save the meta box data
-    $fields = array(
-        'surrounding_address' => '_surrounding_address',
-        'surrounding_distance' => '_surrounding_distance',
+    // Save the meta box data with field-appropriate sanitisation
+    $text_fields = array(
+        'surrounding_address'       => '_surrounding_address',
+        'surrounding_distance'      => '_surrounding_distance',
         'surrounding_travel_options' => '_surrounding_travel_options',
-        'surrounding_map_link' => '_surrounding_map_link',
         'surrounding_opening_hours' => '_surrounding_opening_hours',
-        'surrounding_phone' => '_surrounding_phone',
-        'surrounding_website' => '_surrounding_website',
-        'surrounding_email' => '_surrounding_email'
+        'surrounding_phone'         => '_surrounding_phone',
+    );
+    $url_fields = array(
+        'surrounding_map_link' => '_surrounding_map_link',
+        'surrounding_website'  => '_surrounding_website',
     );
 
-    foreach ($fields as $field => $meta_key) {
+    foreach ($text_fields as $field => $meta_key) {
         if (isset($_POST[$field])) {
             update_post_meta($post_id, $meta_key, sanitize_text_field($_POST[$field]));
         }
+    }
+
+    foreach ($url_fields as $field => $meta_key) {
+        if (isset($_POST[$field])) {
+            update_post_meta($post_id, $meta_key, esc_url_raw($_POST[$field]));
+        }
+    }
+
+    if (isset($_POST['surrounding_email'])) {
+        update_post_meta($post_id, '_surrounding_email', sanitize_email($_POST['surrounding_email']));
     }
 }
 add_action('save_post_hotel_surrounding', 'save_hotel_surroundings_meta_box');
