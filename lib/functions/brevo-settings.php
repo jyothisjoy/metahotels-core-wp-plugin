@@ -177,6 +177,8 @@ function metahotels_brevo_render_content() {
     $sender_name = get_option('metahotels_brevo_sender_name', get_bloginfo('name'));
     $sender_email = get_option('metahotels_brevo_sender_email', get_option('admin_email'));
     $senders = get_option('metahotels_brevo_senders', array());
+    $lists_fetch_error = get_option('metahotels_brevo_lists_last_error', '');
+    $sender_fetch_error = get_option('metahotels_brevo_senders_last_error', '');
     
     // Handle API key update and fetch lists
     if (isset($_POST['submit'])) {
@@ -214,22 +216,70 @@ function metahotels_brevo_render_content() {
         update_option('metahotels_brevo_recaptcha_score_threshold', $new_recaptcha_score_threshold);
 
         update_option('metahotels_brevo_debug_mode', $new_debug_mode);
-        
-        // Update local variables for display
+
+        // Update local variables for display in the same request.
+        $api_key = $new_api_key;
+        $recaptcha_site_key = $new_recaptcha_site_key;
+        $recaptcha_secret_key = $new_recaptcha_secret_key;
+        $recaptcha_score_threshold = $new_recaptcha_score_threshold;
+        $default_country = $new_default_country;
         $debug_mode = $new_debug_mode;
+        $ipapi_api_key = $new_ipapi_api_key;
         
         // Only fetch lists and senders if API key is provided
         if (!empty($new_api_key)) {
-            $lists = metahotels_brevo_fetch_lists($new_api_key);
+            $lists_fetch_error = '';
+            $lists = metahotels_brevo_fetch_lists($new_api_key, $lists_fetch_error);
             update_option('metahotels_brevo_lists', $lists, false);
+            update_option('metahotels_brevo_lists_last_error', $lists_fetch_error, false);
 
-            $senders = metahotels_brevo_fetch_senders($new_api_key);
+            $sender_fetch_error = '';
+            $senders = metahotels_brevo_fetch_senders($new_api_key, $sender_fetch_error);
             update_option('metahotels_brevo_senders', $senders, false);
+            update_option('metahotels_brevo_senders_last_error', $sender_fetch_error, false);
 
             echo '<div class="notice notice-success"><p>Settings updated and data fetched successfully!</p></div>';
+            if (!empty($lists_fetch_error)) {
+                echo '<div class="notice notice-error"><p>Brevo lists fetch failed: ' . esc_html($lists_fetch_error) . '</p></div>';
+            }
+            if (!empty($sender_fetch_error)) {
+                echo '<div class="notice notice-error"><p>Brevo senders fetch failed: ' . esc_html($sender_fetch_error) . '</p></div>';
+            }
         } else {
+            $lists = array();
+            $senders = array();
+            $lists_fetch_error = '';
+            $sender_fetch_error = '';
+            update_option('metahotels_brevo_lists', $lists, false);
+            update_option('metahotels_brevo_senders', $senders, false);
+            update_option('metahotels_brevo_lists_last_error', $lists_fetch_error, false);
+            update_option('metahotels_brevo_senders_last_error', $sender_fetch_error, false);
             echo '<div class="notice notice-success"><p>Settings updated successfully!</p></div>';
         }
+    }
+
+    // If an API key already exists but list cache is empty, fetch once so list UI
+    // can populate without requiring a dedicated re-save flow.
+    if (!empty($api_key) && empty($lists)) {
+        $lists_fetch_error = '';
+        $fetched_lists = metahotels_brevo_fetch_lists($api_key, $lists_fetch_error);
+        if (!empty($fetched_lists)) {
+            $lists = $fetched_lists;
+            update_option('metahotels_brevo_lists', $lists, false);
+        }
+        update_option('metahotels_brevo_lists_last_error', $lists_fetch_error, false);
+    }
+
+    // If an API key already exists but sender cache is empty, fetch once so the
+    // transactional sender dropdown is immediately usable.
+    if (!empty($api_key) && empty($senders)) {
+        $sender_fetch_error = '';
+        $fetched_senders = metahotels_brevo_fetch_senders($api_key, $sender_fetch_error);
+        if (!empty($fetched_senders)) {
+            $senders = $fetched_senders;
+            update_option('metahotels_brevo_senders', $senders, false);
+        }
+        update_option('metahotels_brevo_senders_last_error', $sender_fetch_error, false);
     }
     
     // Handle test contact creation
@@ -343,7 +393,13 @@ function metahotels_brevo_render_content() {
                                            name="metahotels_brevo_sender_email"
                                            value="<?php echo esc_attr($sender_email); ?>"
                                            class="metahotels-input" />
-                                    <p class="metahotels-helper-text">No verified senders found. Save your Brevo API key above to load senders from your account.</p>
+                                    <?php
+                                    $sender_error_text = '';
+                                    if (!empty($sender_fetch_error)) {
+                                        $sender_error_text = ' Last fetch error: ' . wp_html_excerpt($sender_fetch_error, 180, '...');
+                                    }
+                                    ?>
+                                    <p class="metahotels-helper-text">No verified senders found. Save your Brevo API key above to load senders from your account.<?php echo esc_html($sender_error_text); ?></p>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -538,13 +594,13 @@ function metahotels_brevo_render_content() {
                 </div>
             </div>
             
-            <?php if (!empty($lists)): ?>
             <div class="metahotels-card">
                  <div class="metahotels-card-header">
                     <h3 class="metahotels-card-title">Available Brevo Lists</h3>
                     <p class="metahotels-card-description">Lists fetched from your Brevo account.</p>
                 </div>
                 <div class="metahotels-card-content" style="padding: 0;">
+                    <?php if (!empty($lists)): ?>
                     <table class="wp-list-table widefat fixed striped" style="border: none; box-shadow: none;">
                         <thead>
                             <tr>
@@ -563,9 +619,19 @@ function metahotels_brevo_render_content() {
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <?php else: ?>
+                    <div style="padding: 1rem;">
+                        <?php
+                        $lists_error_text = '';
+                        if (!empty($lists_fetch_error)) {
+                            $lists_error_text = ' Last fetch error: ' . wp_html_excerpt($lists_fetch_error, 180, '...');
+                        }
+                        ?>
+                        <p class="metahotels-helper-text" style="margin:0;">No Brevo lists found. Save your Brevo API key above to load lists from your account.<?php echo esc_html($lists_error_text); ?></p>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
-            <?php endif; ?>
             
             <div style="margin-top: 2rem;">
                 <?php
@@ -660,85 +726,298 @@ function metahotels_brevo_render_content() {
     <?php
 }
 
-// Fetch lists from Brevo API
-function metahotels_brevo_fetch_lists($api_key) {
+// Fetch lists from Brevo API.
+function metahotels_brevo_fetch_lists($api_key, &$error_message = '') {
+    $error_message = '';
+    if (empty($api_key)) {
+        return array();
+    }
+
     $url = 'https://api.brevo.com/v3/contacts/lists';
-    
     $response = wp_remote_get($url, array(
         'headers' => array(
-            'api-key' => $api_key,
-            'Content-Type' => 'application/json'
-        ),
-        'timeout' => 15,
-        'redirection' => 3,
-        'sslverify' => true,
-    ));
-    
-    if (is_wp_error($response)) {
-        return array();
-    }
-
-    if (wp_remote_retrieve_response_code($response) !== 200) {
-        return array();
-    }
-    
-    $body = wp_remote_retrieve_body($response);
-    $data = json_decode($body, true);
-    
-    if (isset($data['lists']) && is_array($data['lists'])) {
-        $lists = array();
-        foreach ($data['lists'] as $list) {
-            $lists[] = array(
-                'id' => isset($list['id']) ? intval($list['id']) : 0,
-                'name' => isset($list['name']) ? sanitize_text_field($list['name']) : '',
-                'subscribers' => isset($list['uniqueSubscribers']) ? intval($list['uniqueSubscribers']) : 0
-            );
-        }
-        return $lists;
-    }
-    
-    return array();
-}
-
-// Fetch verified senders from Brevo API
-function metahotels_brevo_fetch_senders($api_key) {
-    $response = wp_remote_get('https://api.brevo.com/v3/senders', array(
-        'headers' => array(
             'api-key'      => $api_key,
+            'Accept'       => 'application/json',
             'Content-Type' => 'application/json',
         ),
-        'timeout' => 15,
+        'timeout' => 20,
         'redirection' => 3,
         'sslverify' => true,
     ));
 
     if (is_wp_error($response)) {
+        $error_message = sanitize_text_field($response->get_error_message());
+        metahotels_brevo_log('Lists fetch WP_Error', array('error' => $error_message));
         return array();
     }
 
-    if (wp_remote_retrieve_response_code($response) !== 200) {
+    $status = intval(wp_remote_retrieve_response_code($response));
+    $body_raw = (string) wp_remote_retrieve_body($response);
+
+    if ($status !== 200) {
+        $detail = metahotels_brevo_extract_api_error($body_raw);
+        $error_message = 'HTTP ' . $status . ($detail !== '' ? (' - ' . $detail) : '');
+        metahotels_brevo_log('Lists fetch non-200 response', array('status' => $status, 'detail' => $detail));
         return array();
     }
 
-    $body = json_decode(wp_remote_retrieve_body($response), true);
-
-    if (!isset($body['senders']) || !is_array($body['senders'])) {
+    $data = json_decode($body_raw, true);
+    if (!is_array($data)) {
+        $error_message = 'Invalid JSON response';
+        metahotels_brevo_log('Lists fetch invalid JSON');
         return array();
+    }
+
+    $raw_lists = array();
+    if (isset($data['lists']) && is_array($data['lists'])) {
+        $raw_lists = $data['lists'];
+    } elseif (isset($data['data']['lists']) && is_array($data['data']['lists'])) {
+        $raw_lists = $data['data']['lists'];
+    } elseif (array_keys($data) === range(0, count($data) - 1)) {
+        $raw_lists = $data;
+    }
+
+    if (empty($raw_lists)) {
+        $error_message = 'No lists returned by API';
+        return array();
+    }
+
+    $lists = array();
+    foreach ($raw_lists as $list) {
+        if (!is_array($list)) {
+            continue;
+        }
+        $lists[] = array(
+            'id' => isset($list['id']) ? intval($list['id']) : 0,
+            'name' => isset($list['name']) ? sanitize_text_field($list['name']) : '',
+            'subscribers' => isset($list['uniqueSubscribers']) ? intval($list['uniqueSubscribers']) : 0
+        );
+    }
+
+    return $lists;
+}
+
+/**
+ * Force Brevo API calls over IPv4 when cURL transport is used.
+ *
+ * Local/dev environments often egress via temporary IPv6 addresses that fail
+ * Brevo's IP allowlist checks even after manual authorization.
+ */
+function metahotels_brevo_force_ipv4_curl($handle, $request_args, $url) {
+    if (!is_string($url) || strpos($url, 'api.brevo.com') === false) {
+        return;
+    }
+
+    if (!defined('CURLOPT_IPRESOLVE') || !defined('CURL_IPRESOLVE_V4')) {
+        return;
+    }
+
+    /**
+     * Filter: allow disabling forced IPv4 for Brevo requests.
+     *
+     * Example usage:
+     * add_filter('metahotels_brevo_force_ipv4_requests', '__return_false');
+     */
+    $force_ipv4 = (bool) apply_filters('metahotels_brevo_force_ipv4_requests', true);
+    if (!$force_ipv4) {
+        return;
+    }
+
+    curl_setopt($handle, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+}
+add_action('http_api_curl', 'metahotels_brevo_force_ipv4_curl', 10, 3);
+
+/**
+ * Extract a readable error from a Brevo API response payload.
+ */
+function metahotels_brevo_extract_api_error($body_raw) {
+    $decoded = json_decode((string) $body_raw, true);
+    if (!is_array($decoded)) {
+        return '';
+    }
+
+    foreach (array('message', 'error', 'detail', 'code') as $key) {
+        if (isset($decoded[$key]) && is_scalar($decoded[$key]) && (string) $decoded[$key] !== '') {
+            return sanitize_text_field((string) $decoded[$key]);
+        }
+    }
+
+    if (isset($decoded['errors']) && is_array($decoded['errors'])) {
+        $first = reset($decoded['errors']);
+        if (is_scalar($first) && (string) $first !== '') {
+            return sanitize_text_field((string) $first);
+        }
+        if (is_array($first)) {
+            foreach (array('message', 'error', 'detail') as $key) {
+                if (isset($first[$key]) && is_scalar($first[$key]) && (string) $first[$key] !== '') {
+                    return sanitize_text_field((string) $first[$key]);
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Normalize sender payloads returned by different Brevo sender endpoints.
+ */
+function metahotels_brevo_normalize_senders_payload($payload) {
+    if (!is_array($payload)) {
+        return array();
+    }
+
+    $collections = array();
+    if (isset($payload['senders']) && is_array($payload['senders'])) {
+        $collections[] = $payload['senders'];
+    }
+    if (isset($payload['smtp_senders']) && is_array($payload['smtp_senders'])) {
+        $collections[] = $payload['smtp_senders'];
+    }
+    if (isset($payload['data']['senders']) && is_array($payload['data']['senders'])) {
+        $collections[] = $payload['data']['senders'];
+    }
+
+    // Some endpoints may return an array of sender objects as the root payload.
+    $is_root_list = array_keys($payload) === range(0, count($payload) - 1);
+    if ($is_root_list) {
+        $collections[] = $payload;
     }
 
     $senders = array();
-    foreach ($body['senders'] as $s) {
-        if (!empty($s['email'])) {
+    $seen = array();
+
+    foreach ($collections as $items) {
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $raw_email = '';
+            if (!empty($item['email'])) {
+                $raw_email = $item['email'];
+            } elseif (!empty($item['fromEmail'])) {
+                $raw_email = $item['fromEmail'];
+            } elseif (isset($item['sender']) && is_array($item['sender']) && !empty($item['sender']['email'])) {
+                $raw_email = $item['sender']['email'];
+            }
+
+            $email = sanitize_email((string) $raw_email);
+            if (empty($email)) {
+                continue;
+            }
+
+            $email_key = strtolower($email);
+            if (isset($seen[$email_key])) {
+                continue;
+            }
+
+            $raw_name = '';
+            if (!empty($item['name'])) {
+                $raw_name = $item['name'];
+            } elseif (!empty($item['fromName'])) {
+                $raw_name = $item['fromName'];
+            } elseif (isset($item['sender']) && is_array($item['sender']) && !empty($item['sender']['name'])) {
+                $raw_name = $item['sender']['name'];
+            }
+
+            $name = sanitize_text_field((string) $raw_name);
+            if ($name === '') {
+                $name = $email;
+            }
+
+            $active = true;
+            if (isset($item['active'])) {
+                $active = (bool) $item['active'];
+            } elseif (isset($item['isActive'])) {
+                $active = (bool) $item['isActive'];
+            } elseif (isset($item['status'])) {
+                $active = strtolower((string) $item['status']) !== 'inactive';
+            }
+
+            $id = 0;
+            if (isset($item['id'])) {
+                $id = intval($item['id']);
+            } elseif (isset($item['senderId'])) {
+                $id = intval($item['senderId']);
+            }
+
             $senders[] = array(
-                'id'     => isset($s['id']) ? intval($s['id']) : 0,
-                'name'   => isset($s['name']) ? sanitize_text_field($s['name']) : sanitize_email($s['email']),
-                'email'  => sanitize_email($s['email']),
-                'active' => isset($s['active']) ? (bool) $s['active'] : true,
+                'id'     => $id,
+                'name'   => $name,
+                'email'  => $email,
+                'active' => $active,
             );
+            $seen[$email_key] = true;
         }
     }
 
     return $senders;
+}
+
+// Fetch verified senders from Brevo API.
+function metahotels_brevo_fetch_senders($api_key, &$error_message = '') {
+    $error_message = '';
+
+    if (empty($api_key)) {
+        return array();
+    }
+
+    $endpoints = array(
+        'https://api.brevo.com/v3/senders',
+        'https://api.brevo.com/v3/smtp/senders',
+    );
+    $errors = array();
+
+    foreach ($endpoints as $url) {
+        $response = wp_remote_get($url, array(
+            'headers' => array(
+                'api-key'      => $api_key,
+                'Accept'       => 'application/json',
+                'Content-Type' => 'application/json',
+            ),
+            'timeout' => 20,
+            'redirection' => 3,
+            'sslverify' => true,
+        ));
+
+        $path = wp_parse_url($url, PHP_URL_PATH);
+        $path = is_string($path) ? $path : $url;
+
+        if (is_wp_error($response)) {
+            $errors[] = $path . ': ' . sanitize_text_field($response->get_error_message());
+            continue;
+        }
+
+        $status = intval(wp_remote_retrieve_response_code($response));
+        $raw_body = (string) wp_remote_retrieve_body($response);
+
+        if ($status !== 200) {
+            $detail = metahotels_brevo_extract_api_error($raw_body);
+            $errors[] = $path . ': HTTP ' . $status . ($detail !== '' ? (' - ' . $detail) : '');
+            continue;
+        }
+
+        $decoded = json_decode($raw_body, true);
+        if (!is_array($decoded)) {
+            $errors[] = $path . ': invalid JSON response';
+            continue;
+        }
+
+        $senders = metahotels_brevo_normalize_senders_payload($decoded);
+        if (!empty($senders)) {
+            return $senders;
+        }
+
+        $errors[] = $path . ': no senders returned';
+    }
+
+    $error_message = implode(' | ', $errors);
+    if ($error_message !== '') {
+        metahotels_brevo_log('Sender fetch failed', array('error' => $error_message));
+    }
+
+    return array();
 }
 
 // Test contact creation
