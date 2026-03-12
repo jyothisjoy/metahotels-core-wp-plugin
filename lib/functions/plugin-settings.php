@@ -65,21 +65,39 @@ if (!function_exists('metahotels_sanitize_boolean')) {
     }
 }
 
-// Flush rewrite rules after settings are saved
-function metahotels_core_flush_rewrite_rules() {
+// Mark rewrite rules for a single deferred flush per request.
+function metahotels_core_schedule_rewrite_flush($old_value = null, $new_value = null) {
+    if ($old_value === $new_value) {
+        return;
+    }
+    set_transient('metahotels_core_rewrite_flush_needed', 1, MINUTE_IN_SECONDS * 5);
+}
+
+// Flush rewrite rules once after settings updates complete.
+function metahotels_core_maybe_flush_rewrite_rules() {
+    if (!is_admin() || !current_user_can('manage_options')) {
+        return;
+    }
+
+    if (!get_transient('metahotels_core_rewrite_flush_needed')) {
+        return;
+    }
+
+    delete_transient('metahotels_core_rewrite_flush_needed');
     flush_rewrite_rules();
 }
 
 // Flush rewrite rules when post type enable/disable settings change
-add_action('update_option_metahotels_enable_hotels', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_hotel_rooms', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_hotel_surroundings', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_facilities', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_offers', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_careers', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_destinations', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_restaurants', 'metahotels_core_flush_rewrite_rules');
-add_action('update_option_metahotels_enable_meetings', 'metahotels_core_flush_rewrite_rules');
+add_action('update_option_metahotels_enable_hotels', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_hotel_rooms', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_hotel_surroundings', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_facilities', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_offers', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_careers', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_destinations', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_restaurants', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_enable_meetings', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('shutdown', 'metahotels_core_maybe_flush_rewrite_rules', 999);
 
 // Settings page HTML
 function metahotels_core_settings_page() {
@@ -216,7 +234,7 @@ function metahotels_core_settings_page() {
             </form>
             
             <div class="notice notice-info" style="margin-top: 20px;">
-                <p><strong>Note:</strong> After changing these settings, you may need to refresh your permalink structure by going to <a href="<?php echo admin_url('options-permalink.php'); ?>">Settings → Permalinks</a> and clicking "Save Changes".</p>
+                <p><strong>Note:</strong> After changing these settings, you may need to refresh your permalink structure by going to <a href="<?php echo esc_url(admin_url('options-permalink.php')); ?>">Settings &rarr; Permalinks</a> and clicking "Save Changes".</p>
             </div>
         </div>
 
@@ -236,12 +254,17 @@ function metahotels_core_settings_page() {
     document.addEventListener('DOMContentLoaded', function() {
         // Simple tab switching logic
         const settingsWrap = document.querySelector('.metahotels-settings-wrap');
+        if (!settingsWrap) {
+            return;
+        }
+
+        const allowedTabs = ['general', 'marketing'];
         const tabs = settingsWrap.querySelectorAll('.metahotels-tab');
         const contents = settingsWrap.querySelectorAll('.metahotels-tab-content');
         
         // Restore active tab from localStorage
         const savedTab = localStorage.getItem('metahotels_active_tab');
-        if (savedTab) {
+        if (savedTab && allowedTabs.includes(savedTab)) {
             const activeTabBtn = settingsWrap.querySelector(`.metahotels-tab[data-tab="${savedTab}"]`);
             if (activeTabBtn) {
                 switchTab(savedTab);
@@ -252,6 +275,9 @@ function metahotels_core_settings_page() {
             tab.addEventListener('click', function(e) {
                 e.preventDefault();
                 const tabId = this.getAttribute('data-tab');
+                if (!allowedTabs.includes(tabId)) {
+                    return;
+                }
                 switchTab(tabId);
                 localStorage.setItem('metahotels_active_tab', tabId);
             });
@@ -361,7 +387,7 @@ add_filter('get_default_comment_status', 'metahotels_default_comment_status', 10
 function metahotels_disable_comment_feeds() {
     if (metahotels_comments_disabled()) {
         $feed = get_query_var('feed');
-        if (in_array($feed, array('comments-rss2', 'comments-rss', 'comments-atom'))) {
+        if (in_array($feed, array('comments-rss2', 'comments-rss', 'comments-atom'), true)) {
             wp_die(__('Comments are disabled.', 'metahotels-core'), '', array('response' => 403));
         }
     }
@@ -429,3 +455,4 @@ function metahotels_disable_comments_rest_api($endpoints) {
     return $endpoints;
 }
 add_filter('rest_endpoints', 'metahotels_disable_comments_rest_api');
+

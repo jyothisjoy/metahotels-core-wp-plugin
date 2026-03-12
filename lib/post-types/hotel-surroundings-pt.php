@@ -1,6 +1,10 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Register the custom post type "Hotel Surroundings"
-function register_hotel_surroundings_post_type() {
+function metahotels_register_hotel_surroundings_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_hotel_surroundings', true)) {
         return; // Don't register if disabled
@@ -37,10 +41,10 @@ function register_hotel_surroundings_post_type() {
 
     register_post_type('hotel_surrounding', $args);
 }
-add_action('init', 'register_hotel_surroundings_post_type');
+add_action('init', 'metahotels_register_hotel_surroundings_post_type');
 
 // Register the taxonomy "Surroundings Category" for "Hotel Surroundings" post type
-function register_surroundings_category_taxonomy() {
+function metahotels_register_surroundings_category_taxonomy() {
     // Only register taxonomy if the hotel surroundings post type is enabled
     if (!get_option('metahotels_enable_hotel_surroundings', true)) {
         return;
@@ -71,23 +75,23 @@ function register_surroundings_category_taxonomy() {
 
     register_taxonomy('surroundings_category', 'hotel_surrounding', $args);
 }
-add_action('init', 'register_surroundings_category_taxonomy');
+add_action('init', 'metahotels_register_surroundings_category_taxonomy');
 
 // Add custom meta boxes for additional fields
-function add_hotel_surroundings_meta_boxes() {
+function metahotels_add_hotel_surroundings_meta_boxes() {
     add_meta_box(
         'hotel_surroundings_details',
         'Location Details',
-        'render_hotel_surroundings_meta_box',
+        'metahotels_render_hotel_surroundings_meta_box',
         'hotel_surrounding',
         'normal',
         'high'
     );
 }
-add_action('add_meta_boxes', 'add_hotel_surroundings_meta_boxes');
+add_action('add_meta_boxes', 'metahotels_add_hotel_surroundings_meta_boxes');
 
 // Render meta box content
-function render_hotel_surroundings_meta_box($post) {
+function metahotels_render_hotel_surroundings_meta_box($post) {
     // Add nonce for security
     wp_nonce_field('hotel_surroundings_meta_box', 'hotel_surroundings_meta_box_nonce');
 
@@ -139,10 +143,14 @@ function render_hotel_surroundings_meta_box($post) {
 }
 
 // Save meta box data
-function save_hotel_surroundings_meta_box($post_id) {
+function metahotels_save_hotel_surroundings_meta_box($post_id) {
     // Check if nonce is set and valid
-    if (!isset($_POST['hotel_surroundings_meta_box_nonce']) || 
-        !wp_verify_nonce($_POST['hotel_surroundings_meta_box_nonce'], 'hotel_surroundings_meta_box')) {
+    if (!isset($_POST['hotel_surroundings_meta_box_nonce'])) {
+        return;
+    }
+
+    $nonce = sanitize_text_field(wp_unslash($_POST['hotel_surroundings_meta_box_nonce']));
+    if (!wp_verify_nonce($nonce, 'hotel_surroundings_meta_box')) {
         return;
     }
 
@@ -171,18 +179,18 @@ function save_hotel_surroundings_meta_box($post_id) {
 
     foreach ($text_fields as $field => $meta_key) {
         if (isset($_POST[$field])) {
-            update_post_meta($post_id, $meta_key, sanitize_text_field($_POST[$field]));
+            update_post_meta($post_id, $meta_key, sanitize_text_field(wp_unslash($_POST[$field])));
         }
     }
 
     foreach ($url_fields as $field => $meta_key) {
         if (isset($_POST[$field])) {
-            update_post_meta($post_id, $meta_key, esc_url_raw($_POST[$field]));
+            update_post_meta($post_id, $meta_key, esc_url_raw(wp_unslash($_POST[$field])));
         }
     }
 
     if (isset($_POST['surrounding_email'])) {
-        update_post_meta($post_id, '_surrounding_email', sanitize_email($_POST['surrounding_email']));
+        update_post_meta($post_id, '_surrounding_email', sanitize_email(wp_unslash($_POST['surrounding_email'])));
     }
 }
-add_action('save_post_hotel_surrounding', 'save_hotel_surroundings_meta_box');
+add_action('save_post_hotel_surrounding', 'metahotels_save_hotel_surroundings_meta_box');

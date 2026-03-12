@@ -1,6 +1,10 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Register the facility custom post type
-function meta_hotels_register_facility_post_type() {
+function metahotels_register_facility_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_facilities', true)) {
         return; // Don't register if disabled
@@ -53,4 +57,11 @@ function meta_hotels_register_facility_post_type() {
         )
     );
 }
-add_action( 'init', 'meta_hotels_register_facility_post_type' );
+add_action( 'init', 'metahotels_register_facility_post_type' );
+
+// Backward-compat shim for older callbacks.
+if (!function_exists('meta_hotels_register_facility_post_type')) {
+    function meta_hotels_register_facility_post_type() {
+        metahotels_register_facility_post_type();
+    }
+}

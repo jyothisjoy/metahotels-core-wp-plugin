@@ -1,54 +1,53 @@
 <?php
 /**
- * Plugin Name: Offers Post Type
- * Description: Registers a custom 'offer' post type with hierarchical categories and two meta fields (Timings and Menu URL).
- * Version:     1.0
- * Author:      Jyothis Joy
- * Text Domain: metahotels
+ * Offers post type registration and meta fields.
  */
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 /**
  * Register the 'offer' custom post type.
  */
-function create_offers_post_type() {
+function metahotels_register_offers_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_offers', true)) {
         return; // Don't register if disabled
     }
 
     $labels = array(
-        'name'                  => _x('Offers', 'Post Type General Name', 'metahotels'),
-        'singular_name'         => _x('Offer', 'Post Type Singular Name', 'metahotels'),
-        'menu_name'             => __('Offers', 'metahotels'),
-        'name_admin_bar'        => __('Offer', 'metahotels'),
-        'archives'              => __('Offer Archives', 'metahotels'),
-        'attributes'            => __('Offer Attributes', 'metahotels'),
-        'parent_item_colon'     => __('Parent Offer:', 'metahotels'),
-        'all_items'             => __('All Offers', 'metahotels'),
-        'add_new_item'          => __('Add New Offer', 'metahotels'),
-        'add_new'               => __('Add New', 'metahotels'),
-        'new_item'              => __('New Offer', 'metahotels'),
-        'edit_item'             => __('Edit Offer', 'metahotels'),
-        'update_item'           => __('Update Offer', 'metahotels'),
-        'view_item'             => __('View Offer', 'metahotels'),
-        'view_items'            => __('View Offers', 'metahotels'),
-        'search_items'          => __('Search Offer', 'metahotels'),
-        'not_found'             => __('Not found', 'metahotels'),
-        'not_found_in_trash'    => __('Not found in Trash', 'metahotels'),
-        'featured_image'        => __('Featured Image', 'metahotels'),
-        'set_featured_image'    => __('Set featured image', 'metahotels'),
-        'remove_featured_image' => __('Remove featured image', 'metahotels'),
-        'use_featured_image'    => __('Use as featured image', 'metahotels'),
-        'insert_into_item'      => __('Insert into offer', 'metahotels'),
-        'uploaded_to_this_item' => __('Uploaded to this offer', 'metahotels'),
-        'items_list'            => __('Offers list', 'metahotels'),
-        'items_list_navigation' => __('Offers list navigation', 'metahotels'),
-        'filter_items_list'     => __('Filter offers list', 'metahotels'),
+        'name'                  => _x('Offers', 'Post Type General Name', 'metahotels-core'),
+        'singular_name'         => _x('Offer', 'Post Type Singular Name', 'metahotels-core'),
+        'menu_name'             => __('Offers', 'metahotels-core'),
+        'name_admin_bar'        => __('Offer', 'metahotels-core'),
+        'archives'              => __('Offer Archives', 'metahotels-core'),
+        'attributes'            => __('Offer Attributes', 'metahotels-core'),
+        'parent_item_colon'     => __('Parent Offer:', 'metahotels-core'),
+        'all_items'             => __('All Offers', 'metahotels-core'),
+        'add_new_item'          => __('Add New Offer', 'metahotels-core'),
+        'add_new'               => __('Add New', 'metahotels-core'),
+        'new_item'              => __('New Offer', 'metahotels-core'),
+        'edit_item'             => __('Edit Offer', 'metahotels-core'),
+        'update_item'           => __('Update Offer', 'metahotels-core'),
+        'view_item'             => __('View Offer', 'metahotels-core'),
+        'view_items'            => __('View Offers', 'metahotels-core'),
+        'search_items'          => __('Search Offer', 'metahotels-core'),
+        'not_found'             => __('Not found', 'metahotels-core'),
+        'not_found_in_trash'    => __('Not found in Trash', 'metahotels-core'),
+        'featured_image'        => __('Featured Image', 'metahotels-core'),
+        'set_featured_image'    => __('Set featured image', 'metahotels-core'),
+        'remove_featured_image' => __('Remove featured image', 'metahotels-core'),
+        'use_featured_image'    => __('Use as featured image', 'metahotels-core'),
+        'insert_into_item'      => __('Insert into offer', 'metahotels-core'),
+        'uploaded_to_this_item' => __('Uploaded to this offer', 'metahotels-core'),
+        'items_list'            => __('Offers list', 'metahotels-core'),
+        'items_list_navigation' => __('Offers list navigation', 'metahotels-core'),
+        'filter_items_list'     => __('Filter offers list', 'metahotels-core'),
     );
 
     $args = array(
-        'label'                 => __('Offer', 'metahotels'),
-        'description'           => __('Post Type Description', 'metahotels'),
+        'label'                 => __('Offer', 'metahotels-core'),
+        'description'           => __('Post Type Description', 'metahotels-core'),
         'labels'                => $labels,
         'supports'              => array('title', 'editor', 'excerpt', 'author', 'thumbnail', 'revisions', 'custom-fields'),
         'taxonomies'            => array('offer_category'),
@@ -68,29 +67,29 @@ function create_offers_post_type() {
     );
     register_post_type('offer', $args);
 }
-add_action('init', 'create_offers_post_type', 1);
+add_action('init', 'metahotels_register_offers_post_type', 1);
 
 /**
  * Register the 'offer_category' taxonomy for Offers.
  */
-function create_offer_taxonomy() {
+function metahotels_register_offer_taxonomy() {
     // Only register taxonomy if the offers post type is enabled
     if (!get_option('metahotels_enable_offers', true)) {
         return;
     }
 
     $labels = array(
-        'name'              => _x('Offer Categories', 'taxonomy general name', 'metahotels'),
-        'singular_name'     => _x('Offer Category', 'taxonomy singular name', 'metahotels'),
-        'search_items'      => __('Search Offer Categories', 'metahotels'),
-        'all_items'         => __('All Offer Categories', 'metahotels'),
-        'parent_item'       => __('Parent Offer Category', 'metahotels'),
-        'parent_item_colon' => __('Parent Offer Category:', 'metahotels'),
-        'edit_item'         => __('Edit Offer Category', 'metahotels'),
-        'update_item'       => __('Update Offer Category', 'metahotels'),
-        'add_new_item'      => __('Add New Offer Category', 'metahotels'),
-        'new_item_name'     => __('New Offer Category Name', 'metahotels'),
-        'menu_name'         => __('Offer Category', 'metahotels'),
+        'name'              => _x('Offer Categories', 'taxonomy general name', 'metahotels-core'),
+        'singular_name'     => _x('Offer Category', 'taxonomy singular name', 'metahotels-core'),
+        'search_items'      => __('Search Offer Categories', 'metahotels-core'),
+        'all_items'         => __('All Offer Categories', 'metahotels-core'),
+        'parent_item'       => __('Parent Offer Category', 'metahotels-core'),
+        'parent_item_colon' => __('Parent Offer Category:', 'metahotels-core'),
+        'edit_item'         => __('Edit Offer Category', 'metahotels-core'),
+        'update_item'       => __('Update Offer Category', 'metahotels-core'),
+        'add_new_item'      => __('Add New Offer Category', 'metahotels-core'),
+        'new_item_name'     => __('New Offer Category Name', 'metahotels-core'),
+        'menu_name'         => __('Offer Category', 'metahotels-core'),
     );
     $args = array(
         'hierarchical'      => true,
@@ -102,25 +101,25 @@ function create_offer_taxonomy() {
     );
     register_taxonomy('offer_category', array('offer'), $args);
 }
-add_action('init', 'create_offer_taxonomy', 0);
+add_action('init', 'metahotels_register_offer_taxonomy', 0);
 
 /**
  * Add meta box for Timings and Menu URL.
  */
-function add_offer_meta_box() {
+function metahotels_add_offer_meta_box() {
     add_meta_box(
         'offer_meta_box',      // Unique ID
         'Offer Details',       // Box title
-        'offer_meta_box_html', // Callback
+        'metahotels_offer_meta_box_html', // Callback
         'offer'                // Post type
     );
 }
-add_action('add_meta_boxes', 'add_offer_meta_box');
+add_action('add_meta_boxes', 'metahotels_add_offer_meta_box');
 
 /**
  * Output Timings and Menu URL fields.
  */
-function offer_meta_box_html($post) {
+function metahotels_offer_meta_box_html($post) {
     wp_nonce_field('offer_meta_box', 'offer_meta_box_nonce');
     $timings = get_post_meta($post->ID, '_timings_meta_key', true);
     $menu_url = get_post_meta($post->ID, '_menu_url_meta_key', true);
@@ -209,28 +208,31 @@ function offer_meta_box_html($post) {
 /**
  * Save Timings and Menu URL meta values.
  */
-function save_offer_meta_box($post_id) {
+function metahotels_save_offer_meta_box($post_id) {
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     if (!current_user_can('edit_post', $post_id)) return;
-    if (!isset($_POST['offer_meta_box_nonce']) || !wp_verify_nonce($_POST['offer_meta_box_nonce'], 'offer_meta_box')) return;
+    if (!isset($_POST['offer_meta_box_nonce'])) return;
+    $nonce = sanitize_text_field(wp_unslash($_POST['offer_meta_box_nonce']));
+    if (!wp_verify_nonce($nonce, 'offer_meta_box')) return;
 
     if (isset($_POST['timings_field'])) {
-        update_post_meta($post_id, '_timings_meta_key', sanitize_text_field($_POST['timings_field']));
+        update_post_meta($post_id, '_timings_meta_key', sanitize_text_field(wp_unslash($_POST['timings_field'])));
     }
     if (isset($_POST['menu_url_field'])) {
-        update_post_meta($post_id, '_menu_url_meta_key', esc_url_raw($_POST['menu_url_field']));
+        update_post_meta($post_id, '_menu_url_meta_key', esc_url_raw(wp_unslash($_POST['menu_url_field'])));
     }
     if (isset($_POST['offer_url_field'])) {
-        update_post_meta($post_id, '_offer_url_meta_key', esc_url_raw($_POST['offer_url_field']));
+        update_post_meta($post_id, '_offer_url_meta_key', esc_url_raw(wp_unslash($_POST['offer_url_field'])));
     }
     if (isset($_POST['offer_terms_field'])) {
-        update_post_meta($post_id, '_offer_terms_meta_key', wp_kses_post($_POST['offer_terms_field']));
+        update_post_meta($post_id, '_offer_terms_meta_key', wp_kses_post(wp_unslash($_POST['offer_terms_field'])));
     }
     if (isset($_POST['offer_includes_field'])) {
-        update_post_meta($post_id, '_offer_includes_meta_key', wp_kses_post($_POST['offer_includes_field']));
+        update_post_meta($post_id, '_offer_includes_meta_key', wp_kses_post(wp_unslash($_POST['offer_includes_field'])));
     }
     if (isset($_POST['offer_excludes_field'])) {
-        update_post_meta($post_id, '_offer_excludes_meta_key', wp_kses_post($_POST['offer_excludes_field']));
+        update_post_meta($post_id, '_offer_excludes_meta_key', wp_kses_post(wp_unslash($_POST['offer_excludes_field'])));
     }
 }
-add_action('save_post', 'save_offer_meta_box');
+add_action('save_post_offer', 'metahotels_save_offer_meta_box');
+

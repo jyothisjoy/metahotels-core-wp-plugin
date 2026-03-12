@@ -1,5 +1,9 @@
 <?php
-function register_hotel_rooms_post_type() {
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+function metahotels_register_hotel_rooms_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_hotel_rooms', true)) {
         return; // Don't register if disabled
@@ -39,9 +43,9 @@ function register_hotel_rooms_post_type() {
 
     register_post_type( 'hotel_room', $args );
 }
-add_action( 'init', 'register_hotel_rooms_post_type' );
+add_action( 'init', 'metahotels_register_hotel_rooms_post_type' );
 
-function register_hotel_category_taxonomy() {
+function metahotels_register_hotel_category_taxonomy() {
     // Only register taxonomy if the hotel rooms post type is enabled
     if (!get_option('metahotels_enable_hotel_rooms', true)) {
         return;
@@ -72,4 +76,4 @@ function register_hotel_category_taxonomy() {
 
     register_taxonomy( 'hotel_category', 'hotel_room', $args );
 }
-add_action( 'init', 'register_hotel_category_taxonomy' );
+add_action( 'init', 'metahotels_register_hotel_category_taxonomy' );

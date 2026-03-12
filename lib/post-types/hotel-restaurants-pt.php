@@ -1,6 +1,10 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Register the restaurant custom post type
-function register_restaurant_post_type() {
+function metahotels_register_restaurant_post_type() {
     // Check if post type is enabled (defaulting to true for now)
     if (!get_option('metahotels_enable_restaurants', true)) {
         return; // Don't register if disabled
@@ -41,4 +45,4 @@ function register_restaurant_post_type() {
 
     register_post_type('restaurant', $args);
 }
-add_action('init', 'register_restaurant_post_type');
+add_action('init', 'metahotels_register_restaurant_post_type');

@@ -1,6 +1,10 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Register the hotel custom post type
-function register_hotel_post_type() {
+function metahotels_register_hotel_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_hotels', true)) {
         return; // Don't register if disabled
@@ -41,10 +45,10 @@ function register_hotel_post_type() {
 
     register_post_type('hotel', $args);
 }
-add_action('init', 'register_hotel_post_type');
+add_action('init', 'metahotels_register_hotel_post_type');
 
 // Register taxonomies for hotels
-function register_hotel_taxonomies() {
+function metahotels_register_hotel_taxonomies() {
     // Only register taxonomies if the hotel post type is enabled
     if (!get_option('metahotels_enable_hotels', true)) {
         return;
@@ -94,4 +98,4 @@ function register_hotel_taxonomies() {
         'rewrite' => array('slug' => 'star-rating'),
     ));
 }
-add_action('init', 'register_hotel_taxonomies');
+add_action('init', 'metahotels_register_hotel_taxonomies');

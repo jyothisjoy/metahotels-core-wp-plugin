@@ -46,24 +46,34 @@ if (file_exists($puc_path)) {
 // Shortcode Includes
 require_once plugin_dir_path(__FILE__) . 'lib/shortcodes/brevo-form-shortcode.php';
 
-// Enhanced conflict resolution for scripts
-add_action('wp_enqueue_scripts', 'metahotels_handle_script_conflicts', 1);
-
-function metahotels_handle_script_conflicts() {
-    // Ensure jQuery is loaded before our scripts
-    wp_enqueue_script('jquery');
-}
-
 // Flush rewrite rules on plugin activation
 register_activation_hook(__FILE__, 'metahotels_flush_rewrite_rules');
 
 function metahotels_flush_rewrite_rules() {
-    // Register post types first
-    register_hotel_post_type();
-    register_hotel_taxonomies();
-    register_restaurant_post_type();
-    register_meeting_post_type();
-    
-    // Then flush rewrite rules
+    // Register all plugin post types/taxonomies before flushing.
+    $registrars = array(
+        'metahotels_register_hotel_post_type',
+        'metahotels_register_hotel_taxonomies',
+        'metahotels_register_hotel_rooms_post_type',
+        'metahotels_register_hotel_category_taxonomy',
+        'metahotels_register_hotel_surroundings_post_type',
+        'metahotels_register_surroundings_category_taxonomy',
+        'metahotels_register_facility_post_type',
+        'metahotels_register_offers_post_type',
+        'metahotels_register_offer_taxonomy',
+        'metahotels_register_careers_post_type',
+        'metahotels_register_career_category_taxonomy',
+        'metahotels_register_destination_post_type',
+        'metahotels_register_destination_taxonomies',
+        'metahotels_register_restaurant_post_type',
+        'metahotels_register_meeting_post_type',
+    );
+
+    foreach ($registrars as $callback) {
+        if (function_exists($callback)) {
+            call_user_func($callback);
+        }
+    }
+
     flush_rewrite_rules();
 }

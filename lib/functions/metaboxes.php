@@ -4,12 +4,12 @@ if (!defined('ABSPATH')) {
 }
 
 // Add meta boxes for hotel selection in related post types
-function add_hotel_selection_meta_box() {
+function metahotels_add_hotel_selection_meta_box() {
     // Add to hotel rooms
     add_meta_box(
         'hotel_selection',
         'Select Hotel',
-        'render_hotel_selection_meta_box',
+        'metahotels_render_hotel_selection_meta_box',
         'hotel_room',
         'normal',
         'high'
@@ -19,7 +19,7 @@ function add_hotel_selection_meta_box() {
     add_meta_box(
         'hotel_selection',
         'Select Hotel',
-        'render_hotel_selection_meta_box',
+        'metahotels_render_hotel_selection_meta_box',
         'facility',
         'normal',
         'high'
@@ -29,7 +29,7 @@ function add_hotel_selection_meta_box() {
     add_meta_box(
         'hotel_selection',
         'Select Hotel',
-        'render_hotel_selection_meta_box',
+        'metahotels_render_hotel_selection_meta_box',
         'hotel_surrounding',
         'normal',
         'high'
@@ -39,15 +39,15 @@ function add_hotel_selection_meta_box() {
     add_meta_box(
         'hotel_selection',
         'Select Hotel',
-        'render_hotel_selection_meta_box',
+        'metahotels_render_hotel_selection_meta_box',
         'offer',
         'normal',
         'high'
     );
 }
-add_action('add_meta_boxes', 'add_hotel_selection_meta_box');
+add_action('add_meta_boxes', 'metahotels_add_hotel_selection_meta_box');
 
-function render_hotel_selection_meta_box($post) {
+function metahotels_render_hotel_selection_meta_box($post) {
     // Add nonce for security
     wp_nonce_field('hotel_selection_meta_box', 'hotel_selection_meta_box_nonce');
 
@@ -71,21 +71,21 @@ function render_hotel_selection_meta_box($post) {
     echo '<select name="selected_hotel" id="selected_hotel" style="width: 100%;">';
     echo '<option value="">Select a Hotel</option>';
     foreach ($hotels as $hotel) {
-        $selected = ($hotel_id == $hotel->ID) ? 'selected' : '';
-        echo '<option value="' . $hotel->ID . '" ' . $selected . '>' . esc_html($hotel->post_title) . '</option>';
+        echo '<option value="' . esc_attr((string) $hotel->ID) . '" ' . selected((int) $hotel_id, (int) $hotel->ID, false) . '>' . esc_html($hotel->post_title) . '</option>';
     }
     echo '</select></p>';
 }
 
 // Save meta box data
-function save_hotel_selection_meta_box($post_id) {
+function metahotels_save_hotel_selection_meta_box($post_id) {
     // Check if our nonce is set
     if (!isset($_POST['hotel_selection_meta_box_nonce'])) {
         return;
     }
 
     // Verify that the nonce is valid
-    if (!wp_verify_nonce($_POST['hotel_selection_meta_box_nonce'], 'hotel_selection_meta_box')) {
+    $nonce = sanitize_text_field(wp_unslash($_POST['hotel_selection_meta_box_nonce']));
+    if (!wp_verify_nonce($nonce, 'hotel_selection_meta_box')) {
         return;
     }
 
@@ -101,7 +101,10 @@ function save_hotel_selection_meta_box($post_id) {
 
     // Save the hotel selection
     if (isset($_POST['selected_hotel'])) {
-        update_post_meta($post_id, '_selected_hotel', absint($_POST['selected_hotel']));
+        update_post_meta($post_id, '_selected_hotel', absint(wp_unslash($_POST['selected_hotel'])));
     }
 }
-add_action('save_post', 'save_hotel_selection_meta_box');
+add_action('save_post_hotel_room', 'metahotels_save_hotel_selection_meta_box');
+add_action('save_post_facility', 'metahotels_save_hotel_selection_meta_box');
+add_action('save_post_hotel_surrounding', 'metahotels_save_hotel_selection_meta_box');
+add_action('save_post_offer', 'metahotels_save_hotel_selection_meta_box');

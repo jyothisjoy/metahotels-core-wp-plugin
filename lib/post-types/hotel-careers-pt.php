@@ -1,5 +1,9 @@
 <?php
-function register_careers_post_type() {
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+function metahotels_register_careers_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_careers', true)) {
         return; // Don't register if disabled
@@ -39,9 +43,9 @@ function register_careers_post_type() {
 
     register_post_type( 'career', $args );
 }
-add_action( 'init', 'register_careers_post_type' );
+add_action( 'init', 'metahotels_register_careers_post_type' );
 
-function register_career_category_taxonomy() {
+function metahotels_register_career_category_taxonomy() {
     // Only register taxonomy if the careers post type is enabled
     if (!get_option('metahotels_enable_careers', true)) {
         return;
@@ -72,4 +76,4 @@ function register_career_category_taxonomy() {
 
     register_taxonomy( 'career_category', 'career', $args );
 }
-add_action( 'init', 'register_career_category_taxonomy' );
+add_action( 'init', 'metahotels_register_career_category_taxonomy' );

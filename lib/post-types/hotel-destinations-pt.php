@@ -1,6 +1,10 @@
 <?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Register the destination custom post type
-function register_destination_post_type() {
+function metahotels_register_destination_post_type() {
     // Check if post type is enabled
     if (!get_option('metahotels_enable_destinations', true)) {
         return; // Don't register if disabled
@@ -38,10 +42,10 @@ function register_destination_post_type() {
 
     register_post_type('destination', $args);
 }
-add_action('init', 'register_destination_post_type');
+add_action('init', 'metahotels_register_destination_post_type');
 
 // Register taxonomies for destinations
-function register_destination_taxonomies() {
+function metahotels_register_destination_taxonomies() {
     // Only register taxonomies if the destinations post type is enabled
     if (!get_option('metahotels_enable_destinations', true)) {
         return;
@@ -91,4 +95,4 @@ function register_destination_taxonomies() {
         'rewrite' => array('slug' => 'country'),
     ));
 }
-add_action('init', 'register_destination_taxonomies'); 
+add_action('init', 'metahotels_register_destination_taxonomies'); 
