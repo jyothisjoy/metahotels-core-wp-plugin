@@ -131,6 +131,7 @@ function metahotels_core_settings_page() {
         <div class="metahotels-tabs">
             <button type="button" class="metahotels-tab active" data-tab="general">General Settings</button>
             <button type="button" class="metahotels-tab" data-tab="marketing">Marketing Settings</button>
+            <button type="button" class="metahotels-tab" data-tab="information">Information</button>
         </div>
 
         <!-- General Settings Tab Content -->
@@ -248,6 +249,17 @@ function metahotels_core_settings_page() {
             }
             ?>
         </div>
+
+        <!-- Information Tab Content -->
+        <div id="tab-information" class="metahotels-tab-content">
+            <?php
+            if (function_exists('metahotels_information_render_content')) {
+                metahotels_information_render_content();
+            } else {
+                echo '<div class="metahotels-card"><div class="metahotels-card-content"><p>Information is not available.</p></div></div>';
+            }
+            ?>
+        </div>
     </div>
     
     <script>
@@ -258,7 +270,7 @@ function metahotels_core_settings_page() {
             return;
         }
 
-        const allowedTabs = ['general', 'marketing'];
+        const allowedTabs = ['general', 'marketing', 'information'];
         const tabs = settingsWrap.querySelectorAll('.metahotels-tab');
         const contents = settingsWrap.querySelectorAll('.metahotels-tab-content');
         
