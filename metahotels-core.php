@@ -32,6 +32,7 @@ require_once plugin_dir_path(__FILE__) . 'lib/functions/post-type-icons.php';
 require_once plugin_dir_path(__FILE__) . 'lib/functions/brevo-settings.php';
 require_once plugin_dir_path(__FILE__) . 'lib/functions/plugin-settings.php';
 require_once plugin_dir_path(__FILE__) . 'lib/functions/room-elementor-tags.php';
+require_once plugin_dir_path(__FILE__) . 'lib/functions/vbg-elementor.php';
 
 // Plugin Update Checker
 $puc_path = plugin_dir_path(__FILE__) . 'lib/plugin-update-checker/plugin-update-checker.php';

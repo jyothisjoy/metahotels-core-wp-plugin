@@ -55,6 +55,14 @@ function metahotels_core_register_settings() {
         'default' => false,
         'sanitize_callback' => 'metahotels_sanitize_boolean'
     ));
+
+    // Register video background feature toggle (off by default so its assets
+    // are not loaded unless the feature is actually in use).
+    register_setting('metahotels_core_options', 'metahotels_enable_video_background', array(
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'metahotels_sanitize_boolean'
+    ));
 }
 add_action('admin_init', 'metahotels_core_register_settings');
 
@@ -131,6 +139,7 @@ function metahotels_core_settings_page() {
         <div class="metahotels-tabs">
             <button type="button" class="metahotels-tab active" data-tab="general">General Settings</button>
             <button type="button" class="metahotels-tab" data-tab="marketing">Marketing Settings</button>
+            <button type="button" class="metahotels-tab" data-tab="other">Other Settings</button>
             <button type="button" class="metahotels-tab" data-tab="information">Information</button>
         </div>
 
@@ -250,6 +259,44 @@ function metahotels_core_settings_page() {
             ?>
         </div>
 
+        <!-- Other Settings Tab Content -->
+        <div id="tab-other" class="metahotels-tab-content">
+            <form method="post" action="options.php">
+                <?php settings_fields('metahotels_core_options'); ?>
+
+                <div class="metahotels-section">
+                    <div class="metahotels-card">
+                        <div class="metahotels-card-header">
+                            <h3 class="metahotels-card-title"><?php esc_html_e('Elementor Enhancements', 'metahotels-core'); ?></h3>
+                            <p class="metahotels-card-description"><?php esc_html_e('Optional front-end features. Their assets load only while the feature is enabled.', 'metahotels-core'); ?></p>
+                        </div>
+                        <div class="metahotels-card-content">
+                            <?php $vbg_enabled = (bool) get_option('metahotels_enable_video_background', false); ?>
+                            <div class="metahotels-switch-wrapper">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">
+                                        <span class="dashicons dashicons-format-video" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
+                                        <?php esc_html_e('Video Background for Sections', 'metahotels-core'); ?>
+                                    </span>
+                                    <span class="metahotels-switch-desc"><?php esc_html_e('Adds a video-background option (R2 / YouTube) to Elementor Sections and Containers. When off, its CSS and JS are not loaded.', 'metahotels-core'); ?></span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="hidden" name="metahotels_enable_video_background" value="0" />
+                                    <input type="checkbox"
+                                           name="metahotels_enable_video_background"
+                                           value="1"
+                                           <?php checked($vbg_enabled, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php submit_button(); ?>
+            </form>
+        </div>
+
         <!-- Information Tab Content -->
         <div id="tab-information" class="metahotels-tab-content">
             <?php
@@ -270,7 +317,7 @@ function metahotels_core_settings_page() {
             return;
         }
 
-        const allowedTabs = ['general', 'marketing', 'information'];
+        const allowedTabs = ['general', 'marketing', 'other', 'information'];
         const tabs = settingsWrap.querySelectorAll('.metahotels-tab');
         const contents = settingsWrap.querySelectorAll('.metahotels-tab-content');
         

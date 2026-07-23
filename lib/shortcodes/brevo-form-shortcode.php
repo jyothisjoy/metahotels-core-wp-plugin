@@ -35,6 +35,90 @@ if (!function_exists('metahotels_brevo_shortcode_log')) {
     }
 }
 
+/**
+ * Redact an IP address for safe logging (keeps only the network portion).
+ * Prevents full visitor IPs (PII) from being written to the debug log.
+ */
+if (!function_exists('metahotels_brevo_mask_ip')) {
+    function metahotels_brevo_mask_ip($ip) {
+        $ip = (string) $ip;
+        if ($ip === '') {
+            return 'unknown';
+        }
+        if (strpos($ip, ':') !== false) {
+            // IPv6: keep only the first hextet.
+            $blocks = explode(':', $ip);
+            return $blocks[0] . ':***';
+        }
+        $octets = explode('.', $ip);
+        if (count($octets) === 4) {
+            return $octets[0] . '.' . $octets[1] . '.x.x';
+        }
+        return '***';
+    }
+}
+
+/**
+ * HMAC secret used to sign the anti-bot form-render timestamp. Reuses the
+ * site AUTH_KEY (same approach as the signed registration cookie).
+ */
+if (!function_exists('metahotels_brevo_form_ts_secret')) {
+    function metahotels_brevo_form_ts_secret() {
+        return defined('AUTH_KEY') ? AUTH_KEY : wp_salt('auth');
+    }
+}
+
+/**
+ * Produce a signed "form rendered at" token embedded in the form. Combined
+ * with a minimum-age check on submit, this cheaply raises the cost of scripted
+ * submissions (bots that post the instant they scrape the form are rejected).
+ */
+if (!function_exists('metahotels_brevo_sign_form_ts')) {
+    function metahotels_brevo_sign_form_ts() {
+        $ts  = time();
+        $sig = hash_hmac('sha256', 'brevo_form_ts|' . $ts, metahotels_brevo_form_ts_secret());
+        return base64_encode($ts . '|' . $sig);
+    }
+}
+
+/**
+ * Verify the signed form timestamp. Returns true only when the signature is
+ * valid AND the form was on screen for at least the minimum age and not longer
+ * than the maximum age. Both bounds are filterable; the max is generous so
+ * full-page caching does not reject legitimate visitors.
+ */
+if (!function_exists('metahotels_brevo_verify_form_ts')) {
+    function metahotels_brevo_verify_form_ts($value) {
+        if (!is_string($value) || $value === '') {
+            return false;
+        }
+        $decoded = base64_decode($value, true);
+        if ($decoded === false) {
+            return false;
+        }
+        $parts = explode('|', $decoded);
+        if (count($parts) !== 2) {
+            return false;
+        }
+        list($ts, $sig) = $parts;
+        $ts = (int) $ts;
+        if ($ts <= 0) {
+            return false;
+        }
+        $expected = hash_hmac('sha256', 'brevo_form_ts|' . $ts, metahotels_brevo_form_ts_secret());
+        if (!hash_equals($expected, (string) $sig)) {
+            return false;
+        }
+        $age     = time() - $ts;
+        $min_age = (int) apply_filters('metahotels_brevo_min_form_age', 2);            // seconds
+        $max_age = (int) apply_filters('metahotels_brevo_max_form_age', DAY_IN_SECONDS);
+        if ($age < $min_age || $age > $max_age) {
+            return false;
+        }
+        return true;
+    }
+}
+
 function metahotels_brevo_form_shortcode($atts) {
     global $metahotels_brevo_form_used;
     $metahotels_brevo_form_used = true;
@@ -84,7 +168,9 @@ function metahotels_brevo_form_shortcode($atts) {
         $output .= '<input type="hidden" name="list_id" value="' . esc_attr($atts['list_id']) . '">';
         $output .= '<input type="hidden" name="redirect_url" value="' . esc_attr($redirect_url) . '">';
         $output .= '<input type="hidden" name="nonce" value="' . esc_attr(wp_create_nonce('metahotels_brevo_nonce')) . '">';
-        
+        // Signed render timestamp for the anti-bot minimum-age check on submit.
+        $output .= '<input type="hidden" name="form_ts" value="' . esc_attr(metahotels_brevo_sign_form_ts()) . '">';
+
         // Honeypot field (hidden from users, visible to bots)
         $output .= '<div style="position: absolute; left: -5000px; top: -5000px; opacity: 0; pointer-events: none;">';
         $output .= '<label for="website_url_' . $form_id . '">Website</label>';
@@ -520,40 +606,8 @@ function metahotels_brevo_form_scripts() {
                                         
                                         if (debugMode) {
                                             console.error('Brevo Form Error:', errorData);
-                                            
-                                            // Log detailed debug information if available
-                                            if (errorData && errorData.debug) {
-                                                console.group('Detailed Debug Information');
-                                                console.log('Request Time:', errorData.debug.request_time);
-                                                console.log('Form Data:', errorData.debug.form_data);
-                                                console.log('API Key Status:', errorData.debug.api_key_status);
-                                                console.log('Contact Data:', errorData.debug.contact_data);
-                                                
-                                                if (errorData.debug.api_request) {
-                                                    console.log('API Request:', errorData.debug.api_request);
-                                                }
-                                                
-                                                if (errorData.debug.api_response) {
-                                                    console.log('API Response Code:', errorData.debug.api_response.code);
-                                                    console.log('API Response Body:', errorData.debug.api_response.body);
-                                                }
-                                                
-                                                if (errorData.debug.api_error_details) {
-                                                    console.error('API Error Details:', errorData.debug.api_error_details);
-                                                }
-                                                
-                                                if (errorData.debug.api_error) {
-                                                    console.error('API Error:', errorData.debug.api_error);
-                                                }
-                                                
-                                                if (errorData.debug.status) {
-                                                    console.log('Status:', errorData.debug.status);
-                                                }
-                                                
-                                                console.groupEnd();
-                                            }
                                         }
-                                        
+
                                         // Ensure errorText is always a string before using .includes()
                                         if (typeof errorText !== 'string') {
                                             errorText = String(errorText || '');
@@ -829,19 +883,40 @@ function metahotels_brevo_get_country_code_handler() {
     
     if ($cached_code !== false) {
         if ($debug_mode) {
-            metahotels_brevo_shortcode_log('IPAPI: Using cached country code for IP: ' . $user_ip);
+            metahotels_brevo_shortcode_log('IPAPI: Using cached country code for IP: ' . metahotels_brevo_mask_ip($user_ip));
         }
         wp_send_json_success(array('country_code' => $cached_code));
         return;
     }
     
-    // Call ipapi.com API
-    $api_url = 'https://api.ipapi.com/api/' . urlencode($user_ip) . '?access_key=' . urlencode($api_key);
-    
-    if ($debug_mode) {
-        metahotels_brevo_shortcode_log('IPAPI: Making API request for IP: ' . $user_ip);
+    // Global daily budget: protect the paid ipapi.com quota against rotating-IP
+    // abuse. Once the per-day cap is reached, serve the configured default
+    // country code instead of calling the API. Keyed per UTC day so it resets
+    // automatically. Filterable; set to 0 to disable the cap.
+    $daily_budget = (int) apply_filters('metahotels_brevo_ipapi_daily_budget', 500);
+    $budget_key   = 'brevo_ipapi_budget_' . gmdate('Ymd');
+    $daily_used   = (int) get_transient($budget_key);
+    if ($daily_budget > 0 && $daily_used >= $daily_budget) {
+        if ($debug_mode) {
+            metahotels_brevo_shortcode_log('IPAPI: daily budget reached; serving default country code');
+        }
+        $default_code = get_option('metahotels_brevo_default_country', '+91');
+        wp_send_json_success(array('country_code' => $default_code, 'source' => 'default'));
+        return;
     }
-    
+
+    // Call ipapi.com API. The access_key must travel in the query string (ipapi
+    // has no header auth); TLS protects it in transit and the full URL is never
+    // logged (only the masked client IP is, and only in debug mode).
+    $api_url = 'https://api.ipapi.com/api/' . urlencode($user_ip) . '?access_key=' . urlencode($api_key);
+
+    if ($debug_mode) {
+        metahotels_brevo_shortcode_log('IPAPI: Making API request for IP: ' . metahotels_brevo_mask_ip($user_ip));
+    }
+
+    // Count this call against the daily budget.
+    set_transient($budget_key, $daily_used + 1, DAY_IN_SECONDS + HOUR_IN_SECONDS);
+
     $response = wp_remote_get($api_url, array(
         'timeout' => 10,
         'redirection' => 3,
@@ -903,15 +978,15 @@ function metahotels_brevo_get_country_code_handler() {
         set_transient($cache_key, $calling_code, 86400);
         
         if ($debug_mode) {
-            metahotels_brevo_shortcode_log('IPAPI: Successfully retrieved country code: ' . $calling_code . ' for IP: ' . $user_ip);
+            metahotels_brevo_shortcode_log('IPAPI: Successfully retrieved country code: ' . $calling_code . ' for IP: ' . metahotels_brevo_mask_ip($user_ip));
         }
-        
+
         wp_send_json_success(array('country_code' => $calling_code));
     } else {
         $error_message = 'Calling code not found in API response';
         if ($debug_mode) {
+            // Log only that extraction failed; never dump the full geo payload (PII).
             metahotels_brevo_shortcode_log('IPAPI: ' . $error_message);
-            metahotels_brevo_shortcode_log('IPAPI Response Data: ' . print_r($data, true));
         }
         wp_send_json_error(array('message' => 'Country code detection unavailable'));
     }
@@ -934,6 +1009,22 @@ function metahotels_brevo_subscribe_handler() {
         }
     }
     set_transient($rate_key, $attempts + 1, 60);
+
+    // Global circuit breaker: caps total submissions per minute across ALL IPs
+    // so a rotating-IP botnet cannot bypass the per-IP limit above. Filterable.
+    $global_limit    = (int) apply_filters('metahotels_brevo_global_submit_limit', 60);
+    if ($global_limit > 0) {
+        $global_key      = 'brevo_sub_global_rate';
+        $global_attempts = (int) get_transient($global_key);
+        if ($global_attempts >= $global_limit) {
+            if (wp_doing_ajax()) {
+                wp_send_json_error(array('message' => 'Service is busy. Please try again shortly.'));
+            } else {
+                wp_die('Service is busy. Please try again shortly.');
+            }
+        }
+        set_transient($global_key, $global_attempts + 1, 60);
+    }
 
     // Get debug mode setting
     $debug_mode = get_option('metahotels_brevo_debug_mode', false);
@@ -999,7 +1090,38 @@ function metahotels_brevo_subscribe_handler() {
             }
         }
 
-        // Verify reCAPTCHA token if secret key is configured.
+        // Anti-bot: reject submissions whose signed render timestamp is missing,
+        // forged, or implausibly fast (see metahotels_brevo_verify_form_ts()).
+        $form_ts = isset($_POST['form_ts']) ? sanitize_text_field(wp_unslash($_POST['form_ts'])) : '';
+        if (!metahotels_brevo_verify_form_ts($form_ts)) {
+            if ($debug_mode) {
+                $debug_data['error'] = 'Form timing check failed';
+                metahotels_brevo_shortcode_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
+            }
+            if (wp_doing_ajax()) {
+                wp_send_json_error(array('message' => 'Submission failed'));
+            } else {
+                wp_die('Submission failed');
+            }
+        }
+
+        // Fail closed if the admin requires reCAPTCHA but no secret key is set,
+        // so a misconfiguration can never silently disable bot protection.
+        $recaptcha_required = (bool) get_option('metahotels_brevo_recaptcha_required', false);
+        if ($recaptcha_required && empty($recaptcha_secret_key)) {
+            if ($debug_mode) {
+                $debug_data['error'] = 'reCAPTCHA required but secret key not configured';
+                metahotels_brevo_shortcode_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
+            }
+            if (wp_doing_ajax()) {
+                wp_send_json_error(array('message' => 'Security check failed'));
+            } else {
+                wp_die('Security check failed');
+            }
+        }
+
+        // Verify reCAPTCHA token if secret key is configured (always enforced
+        // when a secret exists; additionally required when the toggle is on).
         if (!empty($recaptcha_secret_key)) {
             $recaptcha_token = isset($_POST['g-recaptcha-response']) ? sanitize_text_field(wp_unslash($_POST['g-recaptcha-response'])) : '';
             if ($debug_mode) {
@@ -1273,18 +1395,15 @@ function metahotels_brevo_subscribe_handler() {
         $response_body = wp_remote_retrieve_body($response);
         
         if ($debug_mode) {
+            // Log only the HTTP status code; never the raw Brevo response body
+            // (it can contain contact PII).
             $debug_data['api_response'] = array(
                 'code' => $response_code,
-                'body' => json_decode($response_body, true)
             );
         }
-        
+
         if ($response_code === 201 || $response_code === 200 || $response_code === 204) {
             if ($debug_mode) {
-                $response_data_decoded = json_decode($response_body, true);
-                if ($response_data_decoded) {
-                    $debug_data['brevo_response_data'] = $response_data_decoded;
-                }
                 $debug_data['status'] = 'success';
             }
             
@@ -1321,10 +1440,12 @@ function metahotels_brevo_subscribe_handler() {
             }
         } else {
             $error_data = json_decode($response_body, true);
-            
+
             if ($debug_mode) {
                 $debug_data['status'] = 'error';
-                $debug_data['api_error_details'] = $error_data;
+                // Keep only the Brevo error code for troubleshooting; omit the
+                // message/body which may echo submitted contact details.
+                $debug_data['api_error_code'] = (is_array($error_data) && isset($error_data['code'])) ? $error_data['code'] : null;
             }
             
             // Provide user-friendly error messages
@@ -1342,10 +1463,10 @@ function metahotels_brevo_subscribe_handler() {
                     } else {
                         $error_message = 'Unable to save your information';
                     }
-                } elseif (isset($error_data['error'])) {
-                    $error_message = 'Service error';
-                } elseif (isset($error_data['code'])) {
-                    $error_message = 'Service error (Code: ' . $error_data['code'] . ')';
+                } elseif (isset($error_data['error']) || isset($error_data['code'])) {
+                    // Do not reflect upstream provider error codes/details to the
+                    // anonymous submitter; keep the message generic.
+                    $error_message = 'Service temporarily unavailable';
                 }
             } else {
                 $error_message = 'Service temporarily unavailable';

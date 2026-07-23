@@ -1,0 +1,279 @@
+/**
+ * MetaHotels — Video Background (R2) for Elementor.
+ *
+ * Layer sits behind the section content; controls float above it. The layer
+ * and its controls form a required pointer-events pair (see rules below).
+ */
+
+/* Host section becomes the positioning context and clips the video. */
+.elementor-element.has-vbg {
+	position: relative;
+	overflow: hidden;
+}
+
+/* The video layer: full-bleed, behind content, click-through. */
+.vbg-layer {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	--vbg-offset: 20px;
+}
+
+/* Controls are the one interactive island inside the click-through layer. */
+.vbg-layer__controls {
+	pointer-events: auto;
+}
+
+/* Poster fills the layer and shows until the video is ready. */
+.vbg-layer__poster {
+	position: absolute;
+	inset: 0;
+	background-position: center center;
+	background-size: cover;
+	background-repeat: no-repeat;
+}
+
+/* Video fills the layer and fades in once it has data. */
+.vbg-layer__video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0;
+	transition: opacity .6s ease;
+	border: 0;
+}
+
+.vbg-layer.is-ready .vbg-layer__video {
+	opacity: 1;
+}
+
+/* Scrim tint above the video; alpha driven live by the Elementor selector. */
+.vbg-layer__scrim {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0);
+	pointer-events: none;
+}
+
+/* Keep section content and Elementor's own overlay above the video. */
+.has-vbg > .elementor-container,
+.has-vbg > .e-con-inner {
+	position: relative;
+	z-index: 2;
+}
+
+.has-vbg > .elementor-background-overlay {
+	z-index: 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Controls bar                                                        */
+/* ------------------------------------------------------------------ */
+
+.vbg-layer__controls {
+	position: absolute;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	z-index: 3;
+	opacity: 0;
+	transition: opacity .4s ease;
+}
+
+.vbg-layer.is-ready .vbg-layer__controls {
+	opacity: 1;
+}
+
+.vbg-layer__controls.is-pos-br {
+	right: var(--vbg-offset);
+	bottom: var(--vbg-offset);
+}
+
+.vbg-layer__controls.is-pos-bl {
+	left: var(--vbg-offset);
+	bottom: var(--vbg-offset);
+}
+
+.vbg-layer__controls.is-pos-tr {
+	right: var(--vbg-offset);
+	top: var(--vbg-offset);
+}
+
+.vbg-layer__controls.is-pos-tl {
+	left: var(--vbg-offset);
+	top: var(--vbg-offset);
+}
+
+.vbg-layer__label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .14em;
+	text-transform: uppercase;
+	color: #fff;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, .55);
+	line-height: 1;
+	user-select: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pill sound switch                                                   */
+/* ------------------------------------------------------------------ */
+
+.vbg-switch {
+	position: relative;
+	box-sizing: border-box;
+	width: 52px;
+	height: 24px;
+	padding: 0;
+	margin: 0;
+	border: 1.5px solid #fff;
+	border-radius: 999px;
+	background: rgba(0, 0, 0, .35);
+	cursor: pointer;
+	flex: 0 0 auto;
+	-webkit-appearance: none;
+	appearance: none;
+	transition: background .28s cubic-bezier(.4, 0, .2, 1),
+		border-color .28s cubic-bezier(.4, 0, .2, 1);
+}
+
+.vbg-switch__text {
+	position: absolute;
+	top: 50%;
+	left: 7px;
+	/* Horizontal shift is done with transform (not `left`) so a theme rule that
+	   resets positioning offsets on spans cannot strand it. */
+	transform: translate(0, -50%);
+	font-size: 8px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	color: #fff;
+	line-height: 1;
+	transition: transform .28s cubic-bezier(.4, 0, .2, 1),
+		color .28s cubic-bezier(.4, 0, .2, 1);
+	pointer-events: none;
+}
+
+.vbg-switch__knob {
+	position: absolute;
+	top: 50%;
+	left: 3px;
+	width: 15px;
+	height: 15px;
+	/* OFF: knob translated to the right end. Movement is transform-based (see
+	   note above) so it survives theme/Elementor offset resets. */
+	transform: translate(28px, -50%);
+	border-radius: 50%;
+	background: #fff;
+	transition: transform .28s cubic-bezier(.4, 0, .2, 1),
+		background .28s cubic-bezier(.4, 0, .2, 1);
+	pointer-events: none;
+}
+
+/* On state: fill inverts, text moves right + darkens, knob slides left. */
+.vbg-switch[aria-checked="true"] {
+	background: rgba(255, 255, 255, .92);
+	border-color: rgba(255, 255, 255, .92);
+}
+
+.vbg-switch[aria-checked="true"] .vbg-switch__text {
+	transform: translate(13px, -50%);
+	color: #111;
+}
+
+.vbg-switch[aria-checked="true"] .vbg-switch__knob {
+	transform: translate(0, -50%);
+	background: #111;
+}
+
+/* ------------------------------------------------------------------ */
+/* Play / pause glyph button                                          */
+/* ------------------------------------------------------------------ */
+
+.vbg-play {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	margin: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	flex: 0 0 auto;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.vbg-play svg {
+	width: 11px;
+	height: 13px;
+	fill: #fff;
+	filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .55));
+}
+
+/* Glyph swap is driven by .is-paused on the layer. */
+.vbg-play .vbg-play__pause {
+	display: block;
+}
+
+.vbg-play .vbg-play__play {
+	display: none;
+}
+
+.vbg-layer.is-paused .vbg-play .vbg-play__pause {
+	display: none;
+}
+
+.vbg-layer.is-paused .vbg-play .vbg-play__play {
+	display: block;
+}
+
+/* ------------------------------------------------------------------ */
+/* Focus states                                                       */
+/* ------------------------------------------------------------------ */
+
+.vbg-switch:focus-visible,
+.vbg-play:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Editor: never let the layer or controls swallow the selection click */
+/* ------------------------------------------------------------------ */
+
+.elementor-editor-active .vbg-layer,
+.elementor-editor-active .vbg-layer__controls {
+	pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* YouTube source                                                     */
+/* ------------------------------------------------------------------ */
+
+.vbg-layer__yt {
+	position: absolute;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity .6s ease;
+}
+
+.vbg-layer.is-ready .vbg-layer__yt {
+	opacity: 1;
+}
+
+.vbg-layer__yt iframe {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	pointer-events: none;
+}

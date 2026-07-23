@@ -185,7 +185,12 @@ function metahotels_register_room_meta() {
             'single'            => true,
             'sanitize_callback' => ('number' === $def['input']) ? 'absint' : 'sanitize_text_field',
             'show_in_rest'      => true,
-            'auth_callback'     => '__return_true',
+            // Only users who can edit the parent room may write this meta via REST.
+            // Do NOT use __return_true here: that would authorize the meta-layer
+            // capability for every user regardless of the object being edited.
+            'auth_callback'     => function ($allowed, $meta_key, $object_id) {
+                return current_user_can('edit_post', $object_id);
+            },
         ));
     }
 }

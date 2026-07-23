@@ -167,6 +167,7 @@ function metahotels_brevo_render_content() {
     $api_key = get_option('metahotels_brevo_api_key', '');
     $recaptcha_site_key = get_option('metahotels_brevo_recaptcha_site_key', '');
     $recaptcha_secret_key = get_option('metahotels_brevo_recaptcha_secret_key', '');
+    $recaptcha_required = (bool) get_option('metahotels_brevo_recaptcha_required', false);
     $recaptcha_score_threshold = get_option('metahotels_brevo_recaptcha_score_threshold', 0.5);
     $lists = get_option('metahotels_brevo_lists', array());
     $default_country = get_option('metahotels_brevo_default_country', '+91');
@@ -183,9 +184,14 @@ function metahotels_brevo_render_content() {
     // Handle API key update and fetch lists
     if (isset($_POST['submit'])) {
         check_admin_referer('metahotels_brevo_save', 'metahotels_brevo_nonce_field');
-        $new_api_key = isset($_POST['metahotels_brevo_api_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_brevo_api_key'])) : $api_key;
+        // Secret fields use a write-only pattern: the stored value is never
+        // rendered back into the form. A blank submission therefore means
+        // "keep the existing key"; a non-empty submission replaces it.
+        $submitted_api_key = isset($_POST['metahotels_brevo_api_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_brevo_api_key'])) : '';
+        $new_api_key = ('' !== $submitted_api_key) ? $submitted_api_key : $api_key;
         $new_recaptcha_site_key = isset($_POST['metahotels_brevo_recaptcha_site_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_brevo_recaptcha_site_key'])) : $recaptcha_site_key;
-        $new_recaptcha_secret_key = isset($_POST['metahotels_brevo_recaptcha_secret_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_brevo_recaptcha_secret_key'])) : $recaptcha_secret_key;
+        $submitted_recaptcha_secret_key = isset($_POST['metahotels_brevo_recaptcha_secret_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_brevo_recaptcha_secret_key'])) : '';
+        $new_recaptcha_secret_key = ('' !== $submitted_recaptcha_secret_key) ? $submitted_recaptcha_secret_key : $recaptcha_secret_key;
         $new_recaptcha_score_threshold = isset($_POST['metahotels_brevo_recaptcha_score_threshold']) ? floatval(wp_unslash($_POST['metahotels_brevo_recaptcha_score_threshold'])) : $recaptcha_score_threshold;
         // Ensure threshold is between 0 and 1
         if ($new_recaptcha_score_threshold < 0) {
@@ -196,7 +202,9 @@ function metahotels_brevo_render_content() {
         $new_default_country = isset($_POST['metahotels_brevo_default_country']) ? metahotels_sanitize_calling_code(wp_unslash($_POST['metahotels_brevo_default_country'])) : $default_country;
 
         $new_debug_mode = isset($_POST['metahotels_brevo_debug_mode']) && wp_unslash($_POST['metahotels_brevo_debug_mode']) === '1';
-        $new_ipapi_api_key = isset($_POST['metahotels_ipapi_api_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_ipapi_api_key'])) : $ipapi_api_key;
+        $new_recaptcha_required = isset($_POST['metahotels_brevo_recaptcha_required']) && wp_unslash($_POST['metahotels_brevo_recaptcha_required']) === '1';
+        $submitted_ipapi_api_key = isset($_POST['metahotels_ipapi_api_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_ipapi_api_key'])) : '';
+        $new_ipapi_api_key = ('' !== $submitted_ipapi_api_key) ? $submitted_ipapi_api_key : $ipapi_api_key;
         $new_transactional_enabled = isset($_POST['metahotels_brevo_transactional_enabled']) && wp_unslash($_POST['metahotels_brevo_transactional_enabled']) === '1';
         $new_sender_name = isset($_POST['metahotels_brevo_sender_name']) ? sanitize_text_field(wp_unslash($_POST['metahotels_brevo_sender_name'])) : $sender_name;
         $new_sender_email = isset($_POST['metahotels_brevo_sender_email']) ? sanitize_email(wp_unslash($_POST['metahotels_brevo_sender_email'])) : $sender_email;
@@ -214,6 +222,7 @@ function metahotels_brevo_render_content() {
         update_option('metahotels_brevo_recaptcha_site_key', $new_recaptcha_site_key);
         update_option('metahotels_brevo_recaptcha_secret_key', $new_recaptcha_secret_key);
         update_option('metahotels_brevo_recaptcha_score_threshold', $new_recaptcha_score_threshold);
+        update_option('metahotels_brevo_recaptcha_required', $new_recaptcha_required);
 
         update_option('metahotels_brevo_debug_mode', $new_debug_mode);
 
@@ -221,6 +230,7 @@ function metahotels_brevo_render_content() {
         $api_key = $new_api_key;
         $recaptcha_site_key = $new_recaptcha_site_key;
         $recaptcha_secret_key = $new_recaptcha_secret_key;
+        $recaptcha_required = $new_recaptcha_required;
         $recaptcha_score_threshold = $new_recaptcha_score_threshold;
         $default_country = $new_default_country;
         $debug_mode = $new_debug_mode;
@@ -335,11 +345,11 @@ function metahotels_brevo_render_content() {
                             <input type="password"
                                    id="metahotels_brevo_api_key"
                                    name="metahotels_brevo_api_key"
-                                   value="<?php echo esc_attr($api_key); ?>"
+                                   value=""
                                     class="metahotels-input"
                                    autocomplete="off"
-                                   required />
-                            <p class="metahotels-helper-text">Your Brevo API key from Settings > API Keys in your Brevo account.</p>
+                                   placeholder="<?php echo $api_key ? esc_attr__('••••••••  (saved — leave blank to keep)', 'metahotels-core') : esc_attr__('Enter your Brevo API key', 'metahotels-core'); ?>" />
+                            <p class="metahotels-helper-text">Your Brevo API key from Settings > API Keys in your Brevo account. For security it is never displayed; leave blank to keep the saved key, or enter a new value to replace it.</p>
                         </div>
                     </div>
                 </div>
@@ -520,10 +530,11 @@ function metahotels_brevo_render_content() {
                             <input type="password"
                                    id="metahotels_ipapi_api_key"
                                    name="metahotels_ipapi_api_key"
-                                   value="<?php echo esc_attr($ipapi_api_key); ?>"
+                                   value=""
                                    class="metahotels-input"
-                                   autocomplete="off" />
-                            <p class="metahotels-helper-text">Get your free API key from <a href="https://ipapi.com/signup/" target="_blank" rel="noopener noreferrer">ipapi.com</a> for automatic country detection.</p>
+                                   autocomplete="off"
+                                   placeholder="<?php echo $ipapi_api_key ? esc_attr__('••••••••  (saved — leave blank to keep)', 'metahotels-core') : esc_attr__('Enter your ipapi.com API key', 'metahotels-core'); ?>" />
+                            <p class="metahotels-helper-text">Get your free API key from <a href="https://ipapi.com/signup/" target="_blank" rel="noopener noreferrer">ipapi.com</a> for automatic country detection. For security it is never displayed; leave blank to keep the saved key.</p>
                         </div>
                     </div>
                 </div>
@@ -549,8 +560,9 @@ function metahotels_brevo_render_content() {
                                 <input type="password"
                                        id="metahotels_brevo_recaptcha_secret_key"
                                        name="metahotels_brevo_recaptcha_secret_key"
-                                       value="<?php echo esc_attr($recaptcha_secret_key); ?>"
-                                       class="metahotels-input" autocomplete="off" />
+                                       value=""
+                                       class="metahotels-input" autocomplete="off"
+                                       placeholder="<?php echo $recaptcha_secret_key ? esc_attr__('••••••••  (saved — leave blank to keep)', 'metahotels-core') : esc_attr__('Enter your reCAPTCHA secret key', 'metahotels-core'); ?>" />
                             </div>
                         </div>
                         <div class="metahotels-form-group" style="margin-top: 1rem;">
@@ -567,6 +579,19 @@ function metahotels_brevo_render_content() {
                                        style="width: 100px;" />
                                 <span class="metahotels-helper-text" style="margin: 0;">Higher values are stricter (Default: 0.5)</span>
                             </div>
+                        </div>
+                        <div class="metahotels-switch-wrapper" style="margin-top: 1.5rem;">
+                            <div class="metahotels-switch-label">
+                                <span class="metahotels-switch-title">Require reCAPTCHA for form submissions</span>
+                                <span class="metahotels-switch-desc">When enabled, subscription submissions are rejected unless a valid reCAPTCHA token verifies. Fails closed if the secret key above is missing. Leave off to allow captcha-free forms (honeypot and rate limiting still apply).</span>
+                            </div>
+                            <label class="metahotels-switch">
+                                <input type="checkbox"
+                                       name="metahotels_brevo_recaptcha_required"
+                                       value="1"
+                                       <?php checked($recaptcha_required, true); ?> />
+                                <span class="metahotels-slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
