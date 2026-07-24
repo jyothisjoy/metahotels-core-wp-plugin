@@ -3,7 +3,7 @@
 Plugin Name: MetaHotels - Core
 Plugin URI: https://www.jyothisjoy.com
 Description: The core engine for MetaHotels. Manages custom post types (Hotels, Rooms, Offers, etc.) and integrates seamlessly with Brevo for email and WhatsApp marketing. Features include smart country detection and reCAPTCHA v3 security.
-Version: 2.9.7
+Version: 2.9.7.3
 Author: Jyothis Joy
 Author URI: https://www.jyothisjoy.com
 License: GPLv2 or later

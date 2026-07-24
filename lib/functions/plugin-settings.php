@@ -58,7 +58,14 @@ function metahotels_core_register_settings() {
 
     // Register video background feature toggle (off by default so its assets
     // are not loaded unless the feature is actually in use).
-    register_setting('metahotels_core_options', 'metahotels_enable_video_background', array(
+    //
+    // NOTE: This option lives in its own settings group ('metahotels_other_options')
+    // rather than 'metahotels_core_options'. Each <form> that posts to options.php
+    // only submits the fields it renders, and WordPress resets every *other* option
+    // registered in the same group to null. Keeping the "Other Settings" tab in a
+    // separate group prevents saving it from wiping the General Settings options
+    // (and vice versa).
+    register_setting('metahotels_other_options', 'metahotels_enable_video_background', array(
         'type' => 'boolean',
         'default' => false,
         'sanitize_callback' => 'metahotels_sanitize_boolean'
@@ -262,7 +269,7 @@ function metahotels_core_settings_page() {
         <!-- Other Settings Tab Content -->
         <div id="tab-other" class="metahotels-tab-content">
             <form method="post" action="options.php">
-                <?php settings_fields('metahotels_core_options'); ?>
+                <?php settings_fields('metahotels_other_options'); ?>
 
                 <div class="metahotels-section">
                     <div class="metahotels-card">
