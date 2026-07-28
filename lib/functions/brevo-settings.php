@@ -789,11 +789,11 @@ function metahotels_brevo_render_content() {
         
         <h2>Shortcode Usage</h2>
         <p>Use the following shortcode to display a Brevo subscription form:</p>
-        <code>[brevo_form list_id="YOUR_LIST_ID" redirect_url="https://example.com/thank-you" button_text="Book Now"]</code>
+        <code>[brevo_form list_id="YOUR_LIST_ID" redirect_url="/thank-you/" button_text="Book Now"]</code>
         <p><strong>Parameters:</strong></p>
         <ul>
             <li><code>list_id</code> - The Brevo list ID (required)</li>
-            <li><code>redirect_url</code> - URL to redirect after successful subscription (optional)</li>
+            <li><code>redirect_url</code> - Where to send the visitor after a successful subscription (optional). Use a path on this site such as <code>/thank-you/</code>, or a full URL on another domain if you redirect to an external booking engine. Leave it out to show a thank-you message in place of the form instead.</li>
             <li><code>button_text</code> - Submit button text (optional, default: "Book Now")</li>
         </ul>
         

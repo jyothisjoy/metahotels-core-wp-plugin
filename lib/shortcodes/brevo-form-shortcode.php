@@ -119,6 +119,102 @@ if (!function_exists('metahotels_brevo_verify_form_ts')) {
     }
 }
 
+/**
+ * Sign the redirect URL the shortcode was configured with.
+ *
+ * The destination has to travel to the browser and back in a hidden field, so
+ * the submitter can rewrite it before posting. The signature proves the value
+ * came from the shortcode, which is what lets an author-chosen off-site target
+ * (a booking engine on its own domain, say) be honoured without turning the
+ * form into an open redirect.
+ */
+if (!function_exists('metahotels_brevo_sign_redirect')) {
+    function metahotels_brevo_sign_redirect($url) {
+        $url = (string) $url;
+        if ($url === '') {
+            return '';
+        }
+        $sig = hash_hmac('sha256', 'brevo_redirect|' . $url, metahotels_brevo_form_ts_secret());
+        return base64_encode($url . '|' . $sig);
+    }
+}
+
+/**
+ * Recover the signed redirect URL, or '' when the value is missing, malformed
+ * or tampered with.
+ */
+if (!function_exists('metahotels_brevo_verify_redirect')) {
+    function metahotels_brevo_verify_redirect($token) {
+        if (!is_string($token) || $token === '') {
+            return '';
+        }
+        $decoded = base64_decode($token, true);
+        if ($decoded === false) {
+            return '';
+        }
+        // Split on the LAST separator: a query string may itself contain '|'.
+        $pos = strrpos($decoded, '|');
+        if ($pos === false) {
+            return '';
+        }
+        $url      = substr($decoded, 0, $pos);
+        $sig      = substr($decoded, $pos + 1);
+        $expected = hash_hmac('sha256', 'brevo_redirect|' . $url, metahotels_brevo_form_ts_secret());
+        if (!hash_equals($expected, $sig)) {
+            return '';
+        }
+        return $url;
+    }
+}
+
+/**
+ * Turn the posted redirect field into a URL that is safe to send a visitor to.
+ *
+ * A valid signature authorises that URL's host for this request only, so
+ * wp_validate_redirect() still runs and still enforces the scheme allowlist —
+ * javascript:, data: and friends are rejected however well signed they are.
+ * An unsigned value (a page cached before this change, or a tampered one) is
+ * treated as untrusted and falls back to same-site-only.
+ */
+if (!function_exists('metahotels_brevo_resolve_redirect')) {
+    function metahotels_brevo_resolve_redirect($posted) {
+        if (!is_string($posted) || $posted === '') {
+            return '';
+        }
+
+        $signed = metahotels_brevo_verify_redirect($posted);
+
+        if ($signed === '') {
+            // Unsigned: a page cached before this change, or tampering. Only
+            // entertain something actually shaped like a URL — anything else
+            // reads as a relative path and would land the visitor on a 404 here
+            // rather than showing the thank-you message.
+            if (!preg_match('#^(?:https?://|/)#i', $posted)) {
+                return '';
+            }
+            return wp_validate_redirect(esc_url_raw($posted), '');
+        }
+
+        $url = esc_url_raw($signed);
+
+        // A signature means the shortcode author picked this destination, so an
+        // off-site one is honoured. Sites that would rather keep every redirect
+        // on this domain can return false here.
+        if (apply_filters('metahotels_brevo_allow_external_redirect', true, $url)) {
+            $host = wp_parse_url($url, PHP_URL_HOST);
+            if (!empty($host)) {
+                // Also covers the non-AJAX wp_safe_redirect() branch further down.
+                add_filter('allowed_redirect_hosts', function ($hosts) use ($host) {
+                    $hosts[] = $host;
+                    return $hosts;
+                });
+            }
+        }
+
+        return wp_validate_redirect($url, '');
+    }
+}
+
 function metahotels_brevo_form_shortcode($atts) {
     global $metahotels_brevo_form_used;
     $metahotels_brevo_form_used = true;
@@ -166,7 +262,8 @@ function metahotels_brevo_form_shortcode($atts) {
         $output .= '<form id="' . esc_attr($form_id) . '" class="brevo-form" data-ajax-url="' . esc_url(admin_url('admin-ajax.php')) . '">';
         $output .= '<input type="hidden" name="action" value="metahotels_brevo_subscribe">';
         $output .= '<input type="hidden" name="list_id" value="' . esc_attr($atts['list_id']) . '">';
-        $output .= '<input type="hidden" name="redirect_url" value="' . esc_attr($redirect_url) . '">';
+        // Signed, not raw: see metahotels_brevo_sign_redirect().
+        $output .= '<input type="hidden" name="redirect_url" value="' . esc_attr(metahotels_brevo_sign_redirect($redirect_url)) . '">';
         $output .= '<input type="hidden" name="nonce" value="' . esc_attr(wp_create_nonce('metahotels_brevo_nonce')) . '">';
         // Signed render timestamp for the anti-bot minimum-age check on submit.
         $output .= '<input type="hidden" name="form_ts" value="' . esc_attr(metahotels_brevo_sign_form_ts()) . '">';
@@ -1212,10 +1309,18 @@ function metahotels_brevo_subscribe_handler() {
         $whatsapp = isset($_POST['whatsapp']) ? sanitize_text_field(wp_unslash($_POST['whatsapp'])) : '';
         $country_code = isset($_POST['country_code']) ? sanitize_text_field(wp_unslash($_POST['country_code'])) : '';
         $list_id = isset($_POST['list_id']) ? intval(wp_unslash($_POST['list_id'])) : 0;
-        // Validate redirect URL stays on the same site (prevents open redirect).
-        $raw_redirect   = isset($_POST['redirect_url']) ? esc_url_raw(wp_unslash($_POST['redirect_url'])) : '';
-        $redirect_url   = $raw_redirect ? wp_validate_redirect($raw_redirect, '') : '';
-        
+        // Signed token, so sanitize_text_field rather than esc_url_raw here —
+        // the latter would mangle base64. The open-redirect check lives in
+        // metahotels_brevo_resolve_redirect().
+        $raw_redirect   = isset($_POST['redirect_url']) ? sanitize_text_field(wp_unslash($_POST['redirect_url'])) : '';
+        $redirect_url   = metahotels_brevo_resolve_redirect($raw_redirect);
+
+        // A silently dropped redirect looks identical to no redirect at all,
+        // which is exactly what made this hard to diagnose before.
+        if ($debug_mode && $raw_redirect !== '' && $redirect_url === '') {
+            metahotels_brevo_shortcode_log('Redirect dropped: signature invalid, or host not allowed and not same-site.');
+        }
+
         if ($debug_mode) {
             $debug_data['form_data'] = array(
                 'email_hash' => md5(strtolower($email)),

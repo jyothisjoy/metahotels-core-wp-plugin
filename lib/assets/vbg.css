@@ -277,3 +277,68 @@
 	border: 0;
 	pointer-events: none;
 }
+
+/* ------------------------------------------------------------------ */
+/* Wistia source                                                      */
+/* ------------------------------------------------------------------ */
+
+/* No cover math here, unlike YouTube: the player is given the exact box
+   and fills it itself via the fitStrategy:'cover' embed option. */
+.vbg-layer__wistia {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity .6s ease;
+}
+
+.vbg-layer.is-ready .vbg-layer__wistia {
+	opacity: 1;
+}
+
+/* Load-bearing: videoFoam is off, so Wistia sizes nothing above the <video>
+   and every wrapper must be pinned to the box. Without this the embed grows
+   to the source's natural height (measured: 1905x1064 in a 1905x420 section)
+   and the section blows out. */
+.vbg-layer__wistia .wistia_embed,
+.vbg-layer__wistia .wistia_embed > div,
+.vbg-layer__wistia .w-video-wrapper {
+	width: 100%;
+	height: 100%;
+}
+
+/* Fallback only: fitStrategy:'cover' already writes these inline on the
+   <video>, which outranks this rule. Kept so the layer still fills if that
+   option ever stops being applied. */
+.vbg-layer__wistia video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* Wistia rounds the player with an inline border-radius + clip-path. A
+   full-bleed background has to stay square or the section shows through at
+   all four corners. Inline, so !important is required to win. */
+.vbg-layer__wistia .w-chrome {
+	border-radius: 0 !important;
+	clip-path: none !important;
+}
+
+/* Chrome the embed options do not fully suppress. Wistia re-shows each of
+   these on a state change — pause, or the sound toggle — which is exactly when
+   a background must stay invisible, since the section has its own control bar:
+     .w-wistia-logo          branding badge; wistiaLogo:false hides it on load
+                             only, it returns the moment the player pauses
+     .click-for-sound-btn    the silent-autoplay "click for sound" prompt
+     .w-play-pause-notifier  large play/pause glyph that flashes on every toggle
+     .w-bottom-bar           the 44px control strip; playbar/volume/settings are
+                             already off, so only empty slots and the logo live
+                             here — dropping it stops anything reappearing in it
+   All are inline-styled or default-visible, so !important is required. The
+   <video> is not inside any of these, so hiding them cannot hide the media. */
+.vbg-layer__wistia .w-wistia-logo,
+.vbg-layer__wistia .click-for-sound-btn,
+.vbg-layer__wistia .w-play-pause-notifier,
+.vbg-layer__wistia .w-bottom-bar {
+	display: none !important;
+}

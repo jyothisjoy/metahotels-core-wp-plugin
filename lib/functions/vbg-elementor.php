@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 
 // Asset cache-busting version for this feature's CSS/JS.
 if (!defined('METAHOTELS_VBG_VER')) {
-    define('METAHOTELS_VBG_VER', '1.1.3');
+    define('METAHOTELS_VBG_VER', '1.2.0');
 }
 
 // Master switch: keep the entire feature dormant — no Elementor controls, no
@@ -77,6 +77,53 @@ function metahotels_vbg_is_target_element($element) {
 }
 
 /**
+ * Reduce any Wistia reference to its bare hashed media ID.
+ *
+ * The admin field documents one input — the media page URL — but Wistia's
+ * "Embed & Share" dialog also hands out two HTML+JS snippets, and users paste
+ * what they have. Rather than store or echo that markup (which would inject
+ * third-party <script> tags through the page), every accepted form is reduced
+ * here to the ID alone and everything else is discarded. A value that matches
+ * nothing yields '' and the section falls back to poster-only.
+ *
+ * @param string $input Raw field value.
+ * @return string Hashed media ID, or '' when nothing matched.
+ */
+function metahotels_vbg_extract_wistia_id($input) {
+    if (!is_string($input) || '' === $input) {
+        return '';
+    }
+    $s = trim($input);
+
+    // A bare ID is exactly 10 lowercase alphanumerics. Anchored so stray text
+    // can never be mistaken for an ID.
+    if (preg_match('/^[a-z0-9]{10}$/', $s)) {
+        return $s;
+    }
+
+    // Context-anchored patterns are safe with a looser length, since the
+    // surrounding syntax is unambiguous.
+    $patterns = array(
+        // https://account.wistia.com/medias/<id>
+        '#wistia\.(?:com|net)/medias/([A-Za-z0-9]{6,20})#',
+        // https://fast.wistia.net/embed/iframe/<id>, /embed/medias/<id>.jsonp, /embed/<id>.js
+        '#wistia\.(?:com|net)/embed/(?:iframe/|medias/)?([A-Za-z0-9]{6,20})#',
+        // <wistia-player media-id="<id>">
+        '#media-id=["\']([A-Za-z0-9]{6,20})["\']#',
+        // <div class="wistia_embed wistia_async_<id> …">
+        '#wistia_async_([A-Za-z0-9]{6,20})#',
+    );
+
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $s, $m)) {
+            return $m[1];
+        }
+    }
+
+    return '';
+}
+
+/**
  * Inject the Video Background controls directly below the native Background
  * controls in the Style tab.
  *
@@ -122,6 +169,7 @@ function metahotels_vbg_register_controls($element, $section_id, $args) {
             'options'   => array(
                 'file'    => esc_html__('Self-hosted / R2 (MP4)', 'metahotels-core'),
                 'youtube' => esc_html__('YouTube', 'metahotels-core'),
+                'wistia'  => esc_html__('Wistia', 'metahotels-core'),
             ),
             'condition' => array('vbg_enable' => 'yes'),
         )
@@ -176,6 +224,39 @@ function metahotels_vbg_register_controls($element, $section_id, $args) {
     );
 
     $element->add_control(
+        'vbg_wistia',
+        array(
+            'label'       => esc_html__('Wistia Media URL', 'metahotels-core'),
+            'type'        => \Elementor\Controls_Manager::TEXT,
+            'dynamic'     => array('active' => true),
+            'label_block' => true,
+            'placeholder' => 'https://youraccount.wistia.com/medias/0t727spqx5',
+            'description' => esc_html__('Open the video in your Wistia library and copy the address bar URL. Only the media ID is used — any extra parameters are ignored.', 'metahotels-core'),
+            'condition'   => array(
+                'vbg_enable' => 'yes',
+                'vbg_source' => 'wistia',
+            ),
+        )
+    );
+
+    $element->add_control(
+        'vbg_wistia_track',
+        array(
+            'label'        => esc_html__('Wistia Analytics', 'metahotels-core'),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'label_on'     => esc_html__('On', 'metahotels-core'),
+            'label_off'    => esc_html__('Off', 'metahotels-core'),
+            'return_value' => 'yes',
+            'default'      => '',
+            'description'  => esc_html__('Off by default: a background video autoplays on every page view, so tracking it records a play each time and inflates your Wistia stats.', 'metahotels-core'),
+            'condition'    => array(
+                'vbg_enable' => 'yes',
+                'vbg_source' => 'wistia',
+            ),
+        )
+    );
+
+    $element->add_control(
         'vbg_start',
         array(
             'label'     => esc_html__('Loop Start (seconds)', 'metahotels-core'),
@@ -184,7 +265,7 @@ function metahotels_vbg_register_controls($element, $section_id, $args) {
             'min'       => 0,
             'condition' => array(
                 'vbg_enable' => 'yes',
-                'vbg_source' => 'youtube',
+                'vbg_source' => array('youtube', 'wistia'),
             ),
         )
     );
@@ -198,7 +279,7 @@ function metahotels_vbg_register_controls($element, $section_id, $args) {
             'min'       => 0,
             'condition' => array(
                 'vbg_enable' => 'yes',
-                'vbg_source' => 'youtube',
+                'vbg_source' => array('youtube', 'wistia'),
             ),
         )
     );
@@ -237,10 +318,10 @@ function metahotels_vbg_register_controls($element, $section_id, $args) {
             'min'         => 0,
             'max'         => 8,
             'step'        => 0.5,
-            'description' => esc_html__('Alternative to Top Crop: hold the poster longer so the title bar fades before reveal. Pairs with crop 0.', 'metahotels-core'),
+            'description' => esc_html__('Hold the poster longer before revealing the player, hiding the first moments of playback. On YouTube this is the alternative to Top Crop and pairs with crop 0.', 'metahotels-core'),
             'condition'   => array(
                 'vbg_enable' => 'yes',
-                'vbg_source' => 'youtube',
+                'vbg_source' => array('youtube', 'wistia'),
             ),
         )
     );
@@ -391,13 +472,26 @@ function metahotels_vbg_build_config($element) {
     }
 
     $source = 'file';
-    if (isset($settings['vbg_source']) && 'youtube' === $settings['vbg_source']) {
-        $source = 'youtube';
+    if (isset($settings['vbg_source'])
+        && in_array($settings['vbg_source'], array('youtube', 'wistia'), true)) {
+        $source = $settings['vbg_source'];
     }
 
     $youtube = isset($settings['vbg_youtube']) ? sanitize_text_field(trim($settings['vbg_youtube'])) : '';
     $start   = isset($settings['vbg_start']) ? absint($settings['vbg_start']) : 0;
     $end     = isset($settings['vbg_end']) ? absint($settings['vbg_end']) : 0;
+
+    // Only the hashed ID survives — a pasted embed snippet never reaches the page.
+    $wistia = isset($settings['vbg_wistia'])
+        ? metahotels_vbg_extract_wistia_id($settings['vbg_wistia'])
+        : '';
+    $wistia_track = (isset($settings['vbg_wistia_track']) && 'yes' === $settings['vbg_wistia_track']);
+
+    // Wistia serves a placeholder derived from the ID, so a section reads as
+    // finished without anyone uploading a poster. An explicit poster still wins.
+    if ('wistia' === $source && '' === $poster && '' !== $wistia) {
+        $poster = 'https://fast.wistia.com/embed/medias/' . $wistia . '/swatch';
+    }
 
     $crop = 15.0;
     if (isset($settings['vbg_crop']['size']) && '' !== $settings['vbg_crop']['size']) {
@@ -409,6 +503,11 @@ function metahotels_vbg_build_config($element) {
     // Nothing worth rendering — scoped per source.
     if ('file' === $source) {
         if ('' === $desktop && '' === $mobile && '' === $poster) {
+            return null;
+        }
+    } elseif ('wistia' === $source) {
+        // Wistia: bail when neither a media ID nor a poster is set.
+        if ('' === $wistia && '' === $poster) {
             return null;
         }
     } else {
@@ -448,6 +547,13 @@ function metahotels_vbg_build_config($element) {
         $config['end']     = $end;
         $config['crop']    = $crop;
         $config['hold']    = $hold;
+    } elseif ('wistia' === $source) {
+        $config['source'] = 'wistia';
+        $config['wistia'] = $wistia;
+        $config['start']  = $start;
+        $config['end']    = $end;
+        $config['hold']   = $hold;
+        $config['track']  = $wistia_track;
     } else {
         $config['desktop'] = $desktop;
         $config['mobile']  = $mobile;
@@ -459,9 +565,12 @@ function metahotels_vbg_build_config($element) {
     $config['label']          = $label;
     $config['position']       = $position;
     // Translated strings travel with the config so the JS ships no English.
+    // 'on'/'off' caption the sound pill and must reflect its current state.
     $config['i18n']           = array(
         'play'  => esc_html__('Play video', 'metahotels-core'),
         'pause' => esc_html__('Pause video', 'metahotels-core'),
+        'on'    => esc_html__('ON', 'metahotels-core'),
+        'off'   => esc_html__('OFF', 'metahotels-core'),
     );
 
     return $config;
