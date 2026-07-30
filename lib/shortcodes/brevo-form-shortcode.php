@@ -282,7 +282,10 @@ function metahotels_brevo_form_shortcode($atts) {
         // WhatsApp field
         $output .= '<div>';
         $output .= '<div class="whatsapp-group">';
-        $output .= '<input type="text" name="country_code" id="country_code_' . $form_id . '" value="' . esc_attr($country_code) . '" placeholder="Code" class="country-code-input" maxlength="4" pattern="\+[0-9]{1,3}" required>';
+        // data-default-code lets the script tell "still the server-rendered
+        // default" apart from "the visitor typed this", so IP detection may
+        // replace the former but never the latter.
+        $output .= '<input type="text" name="country_code" id="country_code_' . $form_id . '" value="' . esc_attr($country_code) . '" data-default-code="' . esc_attr($country_code) . '" placeholder="Code" class="country-code-input" maxlength="4" pattern="\+[0-9]{1,3}" required>';
         $output .= '<input type="tel" name="whatsapp" id="whatsapp_' . $form_id . '" placeholder="WhatsApp Number *" required>';
         $output .= '</div>';
         $output .= '</div>';
@@ -531,33 +534,52 @@ function metahotels_brevo_form_scripts() {
                 return;
             }
             
-            // Do not overwrite if user already typed something
-            if ($countryInput.val() && $countryInput.val().trim() !== '') {
-                return;
+            // The field ships pre-filled with the settings default so the form
+            // still submits a usable code without JS. That default is not a
+            // visitor's choice, so it must not block IP detection - only a real
+            // edit does. Comparing against data-default-code keeps the original
+            // intent (never overwrite what someone typed) while letting the
+            // detected code win over the untouched fallback.
+            function isCountryCodeReplaceable() {
+                if ($countryInput.data('userEdited')) {
+                    return false;
+                }
+
+                var current = ($countryInput.val() || '').trim();
+                var defaultCode = ($countryInput.attr('data-default-code') || '').trim();
+
+                return current === '' || current === defaultCode;
             }
-            
+
             // Get debug mode from container
             var $container = $form.closest('.brevo-form-container');
             var debugMode = $container.length > 0 && ($container.data('debug-mode') === 1 || $container.data('debug-mode') === '1');
-            
+
+            if (!isCountryCodeReplaceable()) {
+                if (debugMode) {
+                    console.log('MetaHotels Brevo: Country code was edited, leaving it alone.');
+                }
+                return;
+            }
+
             loadBrevoCountryCode(function(code) {
                 if (!code) {
-                    // Country code detection failed, but form still works
-                    // User can manually enter their country code
+                    // Country code detection failed, but form still works: the
+                    // pre-filled default stays and the user can overwrite it.
                     if (debugMode) {
-                        console.log('MetaHotels Brevo: Country code not auto-filled. User can enter manually.');
+                        console.log('MetaHotels Brevo: Country code not auto-filled, default retained. User can enter manually.');
                     }
                     return;
                 }
-                
-                // Only set if still empty (user might have typed while we were loading)
-                if (!$countryInput.val() || $countryInput.val().trim() === '') {
+
+                // Re-check: the user may have typed while the request was in flight.
+                if (isCountryCodeReplaceable()) {
                     $countryInput.val(code);
                     if (debugMode) {
                         console.log('MetaHotels Brevo: Auto-filled country code: ' + code);
                     }
                 } else if (debugMode) {
-                    console.log('MetaHotels Brevo: Country code field already has value, not overwriting.');
+                    console.log('MetaHotels Brevo: Country code edited while loading, not overwriting.');
                 }
             });
         }
@@ -588,7 +610,12 @@ function metahotels_brevo_form_scripts() {
                 // Auto-format country code field and restrict input
                 $form.find('input[name="country_code"]').on('input keypress', function(e) {
                     var value = $(this).val();
-                    
+
+                    // Real typing (or a paste) marks the field as the visitor's
+                    // own, so an in-flight IP lookup can never overwrite it.
+                    // A programmatic .val() does not fire these events.
+                    $(this).data('userEdited', true);
+
                     // Block any non-numeric characters except + at the beginning
                     if (e.type === 'keypress') {
                         var char = String.fromCharCode(e.which);
@@ -1430,6 +1457,12 @@ function metahotels_brevo_subscribe_handler() {
         // Clean and format the phone number
         $whatsapp = preg_replace('/[^0-9]/', '', $whatsapp);
         $whatsapp = is_string($whatsapp) ? $whatsapp : '';
+
+        // Drop a national trunk prefix (050... -> 50...) before validating, so the
+        // number that gets checked is the same one concatenated into E.164 below.
+        if (function_exists('metahotels_brevo_normalize_national_number')) {
+            $whatsapp = metahotels_brevo_normalize_national_number($whatsapp);
+        }
 
         if (function_exists('metahotels_validate_whatsapp_number')) {
             $phone_errors = metahotels_validate_whatsapp_number($whatsapp, $country_code);

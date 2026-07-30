@@ -536,6 +536,165 @@ function metahotels_brevo_render_content() {
                                    placeholder="<?php echo $ipapi_api_key ? esc_attr__('••••••••  (saved — leave blank to keep)', 'metahotels-core') : esc_attr__('Enter your ipapi.com API key', 'metahotels-core'); ?>" />
                             <p class="metahotels-helper-text">Get your free API key from <a href="https://ipapi.com/signup/" target="_blank" rel="noopener noreferrer">ipapi.com</a> for automatic country detection. For security it is never displayed; leave blank to keep the saved key.</p>
                         </div>
+
+                        <hr style="margin: 1.25rem 0; border: 0; border-top: 1px solid #e2e8f0;" />
+
+                        <?php if (!empty($ipapi_api_key)): ?>
+                        <?php
+                        /**
+                         * On a local or proxied site WordPress only ever sees a loopback or
+                         * edge address for the admin request, so the test asks the browser
+                         * itself for its public IP. Filter to false to keep the test entirely
+                         * server-side (no third-party request from the admin screen).
+                         */
+                        $ipapi_browser_lookup = (bool) apply_filters('metahotels_ipapi_test_browser_ip_lookup', true);
+                        ?>
+                        <div class="metahotels-form-group">
+                            <label class="metahotels-label" for="metahotels_ipapi_test_ip"><?php esc_html_e('Test IP API Connection', 'metahotels-core'); ?></label>
+                            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                                <input type="text"
+                                       id="metahotels_ipapi_test_ip"
+                                       class="metahotels-input"
+                                       style="max-width:260px;"
+                                       autocomplete="off"
+                                       placeholder="<?php esc_attr_e('Optional IP (blank = your own IP)', 'metahotels-core'); ?>" />
+                                <button type="button"
+                                        id="metahotels_ipapi_test_btn"
+                                        class="button button-secondary"
+                                        onclick="metahotelsIpapiTestConnection()">
+                                    <?php esc_html_e('Test Connection', 'metahotels-core'); ?>
+                                </button>
+                            </div>
+                            <p class="metahotels-helper-text">
+                                <?php esc_html_e('Runs a live lookup against api.ipapi.com with the saved key and reports the country and calling code it returns for your own IP — the same field live forms read.', 'metahotels-core'); ?>
+                                <?php if ($ipapi_browser_lookup): ?>
+                                    <?php esc_html_e('On a local site WordPress only sees 127.0.0.1, so when you click Test your browser asks Cloudflare (keyless, no data sent) for its public IP and that address is tested instead. It is also compared against what WordPress sees, which reveals a CDN or reverse proxy breaking visitor detection.', 'metahotels-core'); ?>
+                                <?php endif; ?>
+                                <?php esc_html_e('The test never touches the cache or quota counter used by live forms.', 'metahotels-core'); ?>
+                            </p>
+                        </div>
+                        <div id="metahotels_ipapi_test_result" style="margin-top:1rem; display:none;"></div>
+                        <script>
+                        function metahotelsIpapiTestConnection() {
+                            var ipField     = document.getElementById('metahotels_ipapi_test_ip');
+                            var btn         = document.getElementById('metahotels_ipapi_test_btn');
+                            var result      = document.getElementById('metahotels_ipapi_test_result');
+                            var ajaxUrl     = '<?php echo esc_js(esc_url_raw(admin_url('admin-ajax.php'))); ?>';
+                            var label       = '<?php echo esc_js(__('Test Connection', 'metahotels-core')); ?>';
+                            var lookupOwnIp = <?php echo $ipapi_browser_lookup ? 'true' : 'false'; ?>;
+
+                            function renderNotice(type, message, details) {
+                                result.style.display = 'block';
+                                result.textContent = '';
+
+                                var notice = document.createElement('div');
+                                notice.className = 'notice notice-' + type + ' inline';
+
+                                var text = document.createElement('p');
+                                text.textContent = String(message || '');
+                                notice.appendChild(text);
+
+                                if (details && details.length) {
+                                    var list = document.createElement('ul');
+                                    list.style.margin = '0 0 0.75rem 1.25rem';
+                                    list.style.listStyle = 'disc';
+                                    details.forEach(function(row) {
+                                        var item = document.createElement('li');
+                                        var name = document.createElement('strong');
+                                        name.textContent = String(row[0]) + ': ';
+                                        item.appendChild(name);
+                                        item.appendChild(document.createTextNode(String(row[1])));
+                                        list.appendChild(item);
+                                    });
+                                    notice.appendChild(list);
+                                }
+
+                                result.appendChild(notice);
+                            }
+
+                            function fetchWithTimeout(url, ms) {
+                                if (typeof AbortController === 'undefined') {
+                                    return fetch(url, { cache: 'no-store' });
+                                }
+                                var controller = new AbortController();
+                                var timer = setTimeout(function() { controller.abort(); }, ms);
+                                return fetch(url, { cache: 'no-store', signal: controller.signal })
+                                    .finally(function() { clearTimeout(timer); });
+                            }
+
+                            // Ask an outside observer what this browser's public IP is. Nothing
+                            // is sent to it beyond the request itself, and a failure here is not
+                            // fatal - the server just falls back to the address it can see.
+                            function resolveOwnIp() {
+                                if (!lookupOwnIp) {
+                                    return Promise.resolve({});
+                                }
+                                return fetchWithTimeout('https://www.cloudflare.com/cdn-cgi/trace', 4000)
+                                    .then(function(r) { return r.text(); })
+                                    .then(function(body) {
+                                        var found = {};
+                                        String(body).split('\n').forEach(function(line) {
+                                            var split = line.indexOf('=');
+                                            if (split < 1) { return; }
+                                            var key = line.slice(0, split);
+                                            var value = line.slice(split + 1).trim();
+                                            if (key === 'ip') { found.ip = value; }
+                                            if (key === 'loc') { found.loc = value; }
+                                        });
+                                        if (!found.ip) { throw new Error('no ip in trace'); }
+                                        return found;
+                                    })
+                                    .catch(function() {
+                                        return fetchWithTimeout('https://api.ipify.org?format=json', 4000)
+                                            .then(function(r) { return r.json(); })
+                                            .then(function(j) { return (j && j.ip) ? { ip: j.ip } : {}; })
+                                            .catch(function() { return {}; });
+                                    });
+                            }
+
+                            var manualIp = ipField.value.trim();
+
+                            btn.textContent = '<?php echo esc_js(__('Testing...', 'metahotels-core')); ?>';
+                            btn.disabled    = true;
+                            result.style.display = 'none';
+
+                            // An explicitly entered IP needs no self-lookup.
+                            (manualIp ? Promise.resolve({}) : resolveOwnIp())
+                            .then(function(own) {
+                                var data = new FormData();
+                                data.append('action', 'metahotels_ipapi_test_connection');
+                                data.append('test_ip', manualIp);
+                                data.append('browser_ip', own.ip || '');
+                                data.append('browser_loc', own.loc || '');
+                                data.append('nonce', '<?php echo esc_js(wp_create_nonce('metahotels_ipapi_test_connection')); ?>');
+
+                                return fetch(ajaxUrl, {
+                                    method: 'POST',
+                                    body: data,
+                                    credentials: 'same-origin'
+                                });
+                            })
+                            .then(function(r) { return r.json(); })
+                            .then(function(resp) {
+                                var payload = resp && resp.data ? resp.data : {};
+                                if (resp && resp.success) {
+                                    renderNotice(payload.status === 'warning' ? 'warning' : 'success', payload.message, payload.details);
+                                } else {
+                                    renderNotice('error', payload.message || 'Unknown error', payload.details);
+                                }
+                            })
+                            .catch(function(e) {
+                                renderNotice('error', 'Request failed: ' + (e && e.message ? e.message : 'Unknown error'));
+                            })
+                            .finally(function() {
+                                btn.textContent = label;
+                                btn.disabled    = false;
+                            });
+                        }
+                        </script>
+                        <?php else: ?>
+                        <p class="metahotels-helper-text"><em><?php esc_html_e('Save an ipapi.com API key above to enable the connection test.', 'metahotels-core'); ?></em></p>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -1387,88 +1546,68 @@ function metahotels_brevo_update_contact($api_key, $email, $contact_data) {
 }
 
 
-// Validate WhatsApp number
-function metahotels_validate_whatsapp_number($phone_number, $country_code) {
+/**
+ * Drop a national trunk prefix (a single leading 0) so the E.164 number built
+ * from calling code + national number is actually dialable.
+ *
+ * Guests write their number the way they dial it at home - 050 123 4567 - and
+ * prefixing a calling code to that yields an unreachable number. WhatsApp
+ * numbers are mobile, and no country's mobile number keeps a trunk 0 once an
+ * international prefix is present, so this needs no country knowledge.
+ */
+function metahotels_brevo_normalize_national_number($phone_number) {
+    $digits = preg_replace('/[^0-9]/', '', (string) $phone_number);
+
+    if ('' === $digits || '0' !== $digits[0]) {
+        return $digits;
+    }
+
+    $trimmed = substr($digits, 1);
+
+    // Just "0" - leave it for validation to reject.
+    return ('' === $trimmed) ? $digits : $trimmed;
+}
+
+/**
+ * Validate a WhatsApp number: sanity checks only, deliberately.
+ *
+ * Per-country length and pattern rules used to live here and were removed. Such
+ * a table is never complete, and an unlisted calling code fell back to Indian
+ * rules - which silently rejected every valid UAE, Saudi, Qatar and Singapore
+ * number. Brevo and WhatsApp both validate downstream, so accepting an unusual
+ * number costs far less than turning away a real guest.
+ *
+ * 7-15 digits is the E.164 range. $country_code is unused but retained so
+ * existing two-argument callers keep working.
+ */
+function metahotels_validate_whatsapp_number($phone_number, $country_code = '') {
     $errors = array();
-    
-    // Clean the phone number
-    $clean_number = preg_replace('/[^0-9]/', '', $phone_number);
-    
-    // Basic validation
-    if (empty($clean_number)) {
+
+    $clean_number = preg_replace('/[^0-9]/', '', (string) $phone_number);
+
+    // Note: not empty(), which would treat the string "0" as absent.
+    if ('' === $clean_number) {
         $errors[] = 'Phone number is required';
         return $errors;
     }
-    
-    // Check minimum length (most countries require 7-15 digits)
+
     if (strlen($clean_number) < 7) {
         $errors[] = 'Phone number is too short';
-    }
-    
-    if (strlen($clean_number) > 15) {
+    } elseif (strlen($clean_number) > 15) {
         $errors[] = 'Phone number is too long';
     }
-    
-    // Country-specific validation
-    $country_validations = array(
-        'IN' => array('min' => 10, 'max' => 10, 'pattern' => '/^[6-9]\d{9}$/'), // India
-        'US' => array('min' => 10, 'max' => 10, 'pattern' => '/^\d{10}$/'), // USA
-        'GB' => array('min' => 10, 'max' => 11, 'pattern' => '/^[1-9]\d{9,10}$/'), // UK
-        'DE' => array('min' => 10, 'max' => 12, 'pattern' => '/^[1-9]\d{9,11}$/'), // Germany
-        'FR' => array('min' => 10, 'max' => 10, 'pattern' => '/^[1-9]\d{8}$/'), // France
-        'AU' => array('min' => 9, 'max' => 9, 'pattern' => '/^[2-9]\d{8}$/'), // Australia
-        'CA' => array('min' => 10, 'max' => 10, 'pattern' => '/^\d{10}$/'), // Canada
-        'BR' => array('min' => 10, 'max' => 11, 'pattern' => '/^[1-9]\d{9,10}$/'), // Brazil
-        'MX' => array('min' => 10, 'max' => 10, 'pattern' => '/^[1-9]\d{9}$/'), // Mexico
-        'JP' => array('min' => 10, 'max' => 11, 'pattern' => '/^[1-9]\d{9,10}$/'), // Japan
-        'KR' => array('min' => 10, 'max' => 11, 'pattern' => '/^[1-9]\d{9,10}$/'), // South Korea
-        'CN' => array('min' => 11, 'max' => 11, 'pattern' => '/^1[3-9]\d{9}$/'), // China
-    );
-    
-    // Get country code without +
-    $country = str_replace('+', '', $country_code);
-    $country_map = array(
-        '91' => 'IN', '1' => 'US', '44' => 'GB', '49' => 'DE', '33' => 'FR',
-        '61' => 'AU', '55' => 'BR', '52' => 'MX', '81' => 'JP', '82' => 'KR', '86' => 'CN'
-    );
-    
-    $country_code_clean = $country_map[$country] ?? 'IN'; // Default to India
-    
-    if (isset($country_validations[$country_code_clean])) {
-        $validation = $country_validations[$country_code_clean];
-        
-        // Check length
-        if (strlen($clean_number) < $validation['min']) {
-            $errors[] = 'Phone number is too short for ' . $country_code_clean . ' format';
-        }
-        
-        if (strlen($clean_number) > $validation['max']) {
-            $errors[] = 'Phone number is too long for ' . $country_code_clean . ' format';
-        }
-        
-        // Check pattern
-        if (!preg_match($validation['pattern'], $clean_number)) {
-            $errors[] = 'Phone number format is invalid for ' . $country_code_clean;
-        }
-    }
-    
-    // Check for common invalid patterns
+
+    // Obvious junk. Reported one at a time, since only the first error is shown.
     if (preg_match('/^0+$/', $clean_number)) {
         $errors[] = 'Phone number cannot be all zeros';
-    }
-    
-    if (preg_match('/^1+$/', $clean_number)) {
+    } elseif (preg_match('/^1+$/', $clean_number)) {
         $errors[] = 'Phone number cannot be all ones';
-    }
-    
-    // Check for sequential numbers (likely fake)
-    if (preg_match('/^(.)\1{5,}$/', $clean_number)) {
+    } elseif (preg_match('/^(.)\1{5,}$/', $clean_number)) {
         $errors[] = 'Phone number appears to be invalid (repeated digits)';
     }
-    
+
     return $errors;
 }
-
 // Cryptographically sign cookie value to prevent tampering
 function metahotels_sign_brevo_cookie($email) {
     if (empty($email) || !is_email($email)) {
@@ -1982,6 +2121,227 @@ function metahotels_brevo_send_test_email_handler() {
     wp_send_json_error(array('message' => 'Brevo API error: ' . $detail));
 }
 add_action('wp_ajax_metahotels_brevo_send_test_email', 'metahotels_brevo_send_test_email_handler');
+
+/**
+ * AJAX: live connectivity test for the ipapi.com (IP API) integration.
+ *
+ * Deliberately side-effect free with respect to the front end: it neither reads
+ * nor writes the per-IP country-code transient and does not touch the daily
+ * budget counter, so testing can never poison the cache live forms read from,
+ * nor exhaust their quota allowance. A per-admin rate limit keeps repeated
+ * clicks from burning the paid ipapi.com quota.
+ */
+function metahotels_ipapi_test_connection_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Unauthorized'));
+        return;
+    }
+
+    if (!check_ajax_referer('metahotels_ipapi_test_connection', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Security check failed'));
+        return;
+    }
+
+    $api_key = get_option('metahotels_ipapi_api_key', '');
+    if (empty($api_key)) {
+        wp_send_json_error(array('message' => 'No ipapi.com API key is saved. Enter the key, save the settings, then run the test.'));
+        return;
+    }
+
+    $rate_key = 'metahotels_ipapi_test_' . get_current_user_id();
+    $attempts = (int) get_transient($rate_key);
+    if ($attempts >= 10) {
+        wp_send_json_error(array('message' => 'Too many tests in a row. Please wait a few minutes before testing again.'));
+        return;
+    }
+    set_transient($rate_key, $attempts + 1, 5 * MINUTE_IN_SECONDS);
+
+    $manual_ip   = isset($_POST['test_ip']) ? sanitize_text_field(wp_unslash($_POST['test_ip'])) : '';
+    $browser_ip  = isset($_POST['browser_ip']) ? sanitize_text_field(wp_unslash($_POST['browser_ip'])) : '';
+    $browser_loc = isset($_POST['browser_loc']) ? sanitize_text_field(wp_unslash($_POST['browser_loc'])) : '';
+    $browser_loc = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $browser_loc), 0, 2));
+    $remote_addr = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
+
+    $browser_ip = metahotels_ipapi_is_public_ip($browser_ip) ? $browser_ip : '';
+
+    if ('' !== $manual_ip) {
+        if (!filter_var($manual_ip, FILTER_VALIDATE_IP)) {
+            wp_send_json_error(array('message' => 'That is not a valid IP address. Leave the field blank to test with your own IP.'));
+            return;
+        }
+        if (!metahotels_ipapi_is_public_ip($manual_ip)) {
+            wp_send_json_error(array('message' => 'That address is private or reserved, so ipapi.com holds no location data for it. Enter a public IP, or leave the field blank to test with your own.'));
+            return;
+        }
+        $test_ip     = $manual_ip;
+        $test_source = 'the IP you entered';
+    } elseif (metahotels_ipapi_is_public_ip($remote_addr)) {
+        // The best possible test: the exact address the front-end handler would
+        // read for this request, so a pass here means live detection works.
+        $test_ip     = $remote_addr;
+        $test_source = 'your IP, exactly as WordPress sees it';
+    } elseif ('' !== $browser_ip) {
+        // WordPress sees only a loopback/LAN address (typical for Local or any
+        // localhost install), so fall back to the public IP the browser reported.
+        $test_ip     = $browser_ip;
+        $test_source = 'your browser\'s public IP (WordPress sees only ' . ('' !== $remote_addr ? $remote_addr : 'a local address') . ' here)';
+    } else {
+        wp_send_json_error(array(
+            'message' => 'WordPress only sees a local address (' . ('' !== $remote_addr ? $remote_addr : 'unknown') . ') for this request, and your browser\'s public IP could not be determined. Enter an IP address in the field to test the key directly.',
+        ));
+        return;
+    }
+
+    // The access_key must travel in the query string (ipapi has no header auth);
+    // TLS protects it in transit and the full URL is never logged.
+    $api_url = 'https://api.ipapi.com/api/' . urlencode($test_ip) . '?access_key=' . urlencode($api_key);
+
+    metahotels_brevo_log('IPAPI connection test started', array(
+        'ip'     => function_exists('metahotels_brevo_mask_ip') ? metahotels_brevo_mask_ip($test_ip) : '***',
+        'source' => $test_source,
+    ));
+
+    $started  = microtime(true);
+    $response = wp_remote_get($api_url, array(
+        'timeout'     => 15,
+        'redirection' => 3,
+        'sslverify'   => true,
+    ));
+    $elapsed_ms = (int) round((microtime(true) - $started) * 1000);
+
+    if (is_wp_error($response)) {
+        metahotels_brevo_log('IPAPI connection test failed', array('error' => $response->get_error_message()));
+        wp_send_json_error(array(
+            'message' => 'Could not reach api.ipapi.com: ' . sanitize_text_field($response->get_error_message()),
+        ));
+        return;
+    }
+
+    $response_code = (int) wp_remote_retrieve_response_code($response);
+    metahotels_brevo_log('IPAPI connection test response', array('status' => $response_code, 'ms' => $elapsed_ms));
+
+    if (429 === $response_code) {
+        wp_send_json_error(array('message' => 'ipapi.com rate limit exceeded (HTTP 429). Wait a moment and test again.'));
+        return;
+    }
+
+    if (401 === $response_code || 403 === $response_code) {
+        wp_send_json_error(array('message' => 'ipapi.com refused the request (HTTP ' . $response_code . '). The saved API key is most likely wrong or disabled.'));
+        return;
+    }
+
+    if (200 !== $response_code) {
+        wp_send_json_error(array('message' => 'ipapi.com returned an unexpected response (HTTP ' . $response_code . ').'));
+        return;
+    }
+
+    $data = json_decode(wp_remote_retrieve_body($response), true);
+    if (!is_array($data)) {
+        wp_send_json_error(array('message' => 'ipapi.com returned a response that could not be read as JSON.'));
+        return;
+    }
+
+    // ipapi reports application-level failures with HTTP 200 + success:false.
+    if (isset($data['success']) && false === $data['success']) {
+        $error_code = isset($data['error']['code']) ? (int) $data['error']['code'] : 0;
+        $error_info = isset($data['error']['info']) ? sanitize_text_field(wp_strip_all_tags((string) $data['error']['info'])) : '';
+
+        $hints = array(
+            101 => 'The API key was rejected. Re-copy it from your ipapi.com dashboard and save the settings again.',
+            102 => 'The ipapi.com account is inactive.',
+            103 => 'The API endpoint this plugin calls does not exist on ipapi.com.',
+            104 => 'The monthly request quota for this ipapi.com plan is used up.',
+            105 => 'The current ipapi.com subscription plan does not permit this request — HTTPS access is restricted on the free plan.',
+            106 => 'ipapi.com has no data for that IP address.',
+        );
+
+        $message = isset($hints[$error_code]) ? $hints[$error_code] : 'ipapi.com rejected the request.';
+        if ('' !== $error_info) {
+            $message .= ' (' . $error_info . ')';
+        }
+
+        metahotels_brevo_log('IPAPI connection test rejected', array('code' => $error_code));
+        wp_send_json_error(array('message' => $message));
+        return;
+    }
+
+    $country_name  = isset($data['country_name']) ? sanitize_text_field((string) $data['country_name']) : '';
+    $country_code  = isset($data['country_code']) ? sanitize_text_field((string) $data['country_code']) : '';
+    $city          = isset($data['city']) ? sanitize_text_field((string) $data['city']) : '';
+    $region        = isset($data['region_name']) ? sanitize_text_field((string) $data['region_name']) : '';
+    $raw_calling   = isset($data['location']['calling_code']) ? preg_replace('/[^0-9]/', '', (string) $data['location']['calling_code']) : '';
+    $calling_code  = ('' !== $raw_calling) ? '+' . $raw_calling : '';
+
+    $location = trim(implode(', ', array_filter(array($city, $region))));
+
+    $details = array(
+        array('IP tested', $test_ip . ' — ' . $test_source),
+        array('Country', trim($country_name . ('' !== $country_code ? ' (' . $country_code . ')' : ''))),
+        array('Calling code', '' !== $calling_code ? $calling_code : 'not returned'),
+        array('Location', '' !== $location ? $location : 'not returned'),
+        array('Response time', $elapsed_ms . ' ms'),
+    );
+
+    // Independent cross-check: the browser's own edge lookup already told us
+    // which country it thinks this connection comes from, so a disagreement is
+    // worth showing rather than silently trusting one source.
+    if ('' === $manual_ip && '' !== $browser_loc && '' !== $country_code) {
+        $agrees = ($browser_loc === strtoupper($country_code));
+        $details[] = array(
+            'Cross-check',
+            $agrees
+                ? 'your browser\'s edge lookup also reports ' . $browser_loc
+                : 'your browser\'s edge lookup reports ' . $browser_loc . ', ipapi.com reports ' . strtoupper($country_code) . ' — a VPN or differing geo database can explain this',
+        );
+    }
+
+    // A public REMOTE_ADDR that differs from the browser's real public IP means
+    // something terminates connections in front of PHP (CDN, reverse proxy, load
+    // balancer). The front-end handler trusts only REMOTE_ADDR, so every visitor
+    // would be geolocated to that intermediary instead of themselves. Compared
+    // only within the same address family, since a dual-stack client can legitimately
+    // reach the edge over IPv6 while PHP records an IPv4 address.
+    $remote_is_public = metahotels_ipapi_is_public_ip($remote_addr);
+    $same_family      = (false !== strpos($remote_addr, ':')) === (false !== strpos($browser_ip, ':'));
+
+    if ($remote_is_public && '' !== $browser_ip && $same_family && $remote_addr !== $browser_ip) {
+        $details[] = array('Proxy detected', 'WordPress sees ' . $remote_addr . ', your browser\'s real public IP is ' . $browser_ip);
+        wp_send_json_success(array(
+            'status'  => 'warning',
+            'message' => 'ipapi.com answered correctly, but a CDN or reverse proxy sits in front of this site: WordPress reads the intermediary\'s address, not the visitor\'s. Country detection on live forms will report the proxy\'s location for everyone.',
+            'details' => $details,
+        ));
+        return;
+    }
+
+    if ('' === $calling_code) {
+        wp_send_json_success(array(
+            'status'  => 'warning',
+            'message' => 'Connected to ipapi.com successfully, but the response carried no calling code for this IP. Forms will fall back to the default country code.',
+            'details' => $details,
+        ));
+        return;
+    }
+
+    wp_send_json_success(array(
+        'status'  => 'success',
+        'message' => 'IP API connection is working. ipapi.com returned valid data for ' . $test_ip . '.',
+        'details' => $details,
+    ));
+}
+
+/**
+ * True only for a routable public IP - the kind ipapi.com can actually geolocate.
+ * Private, loopback and reserved ranges are rejected.
+ */
+function metahotels_ipapi_is_public_ip($ip) {
+    if (!is_string($ip) || '' === $ip) {
+        return false;
+    }
+
+    return (bool) filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+}
+add_action('wp_ajax_metahotels_ipapi_test_connection', 'metahotels_ipapi_test_connection_handler');
 
 // Simple test function for debugging
 function metahotels_brevo_test_ajax() {
