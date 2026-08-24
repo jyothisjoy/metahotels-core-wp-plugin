@@ -253,7 +253,7 @@ function metahotels_brevo_form_shortcode($atts) {
         static $scripts_loaded = false;
         if (!$scripts_loaded) {
             wp_enqueue_script('jquery');
-            wp_enqueue_style('metahotels-brevo-form', plugin_dir_url(__FILE__) . '../assets/brevo-form.css', array(), '1.0.2');
+            wp_enqueue_style('metahotels-brevo-form', plugin_dir_url(__FILE__) . '../assets/brevo-form.css', array(), '1.0.3');
             $scripts_loaded = true;
         }
         
@@ -290,6 +290,16 @@ function metahotels_brevo_form_shortcode($atts) {
         $output .= '</div>';
         $output .= '</div>';
         
+        // Booking-confirmation checkbox. Mandatory: the visitor has to
+        // acknowledge that non-booking enquiries belong on the Contact Us page
+        // before the contact is created. The id is per-form so the label stays a
+        // working click target when several forms share a page.
+        $consent_id = 'booking_confirm_' . $form_id;
+        $output .= '<div class="brevo-form-consent">';
+        $output .= '<input type="checkbox" name="booking_confirm" id="' . esc_attr($consent_id) . '" value="1" required>';
+        $output .= '<label for="' . esc_attr($consent_id) . '">' . esc_html__('Yes — this is a room booking enquiry. I understand all other enquiries must go through the Contact Us page.', 'metahotels-core') . '</label>';
+        $output .= '</div>';
+
         // reCAPTCHA v3 token field (will be filled on submit if enabled)
         if (!empty($recaptcha_site_key)) {
             $output .= '<input type="hidden" name="g-recaptcha-response" value="">';
@@ -655,23 +665,36 @@ function metahotels_brevo_form_scripts() {
                     var email = $form.find('input[name="email"]').val();
                     var whatsapp = $form.find('input[name="whatsapp"]').val();
                     var countryCode = $form.find('input[name="country_code"]').val();
-                    
+                    // Absent on forms rendered before this field existed (a cached
+                    // page): treated as given here, but the server still rejects it.
+                    var $consent = $form.find('input[name="booking_confirm"]');
+                    var consentGiven = ($consent.length === 0) || $consent.is(':checked');
+
                     if (debugMode) {
                         console.log('=== Brevo Form Submission Debug ===');
                         console.log('Form Data:', {
                             email: email,
                             whatsapp: whatsapp,
                             countryCode: countryCode,
+                            bookingConfirmed: consentGiven,
                             listId: $form.find('input[name="list_id"]').val(),
                             redirectUrl: $form.find('input[name="redirect_url"]').val()
                         });
                     }
-                    
+
                     if (!email || !whatsapp) {
                         if (debugMode) {
                             console.error('Brevo Form Error: Missing required fields', { email: email, whatsapp: whatsapp });
                         }
                         alert("Please fill in all required fields.");
+                        return false;
+                    }
+
+                    if (!consentGiven) {
+                        if (debugMode) {
+                            console.error('Brevo Form Error: booking confirmation not accepted');
+                        }
+                        alert("Please confirm that your enquiry is regarding a room booking.");
                         return false;
                     }
                     
@@ -1382,6 +1405,24 @@ function metahotels_brevo_subscribe_handler() {
                 wp_die($error_message);
             }
         }
+
+        // The booking confirmation is enforced here, not only in the browser:
+        // client-side checks are advisory, and the whole point of the field is
+        // that the acknowledgement is on record for every contact created.
+        // An unchecked box is not posted at all, so an absent value fails too.
+        $booking_confirm = isset($_POST['booking_confirm']) ? sanitize_text_field(wp_unslash($_POST['booking_confirm'])) : '';
+        if ('1' !== $booking_confirm) {
+            $error_message = 'Please confirm that your enquiry is regarding a room booking.';
+            if ($debug_mode) {
+                $debug_data['error'] = 'Booking confirmation not accepted';
+                metahotels_brevo_shortcode_log('Brevo Subscribe Debug: ' . wp_json_encode($debug_data));
+            }
+            if (wp_doing_ajax()) {
+                wp_send_json_error(array('message' => $error_message));
+            } else {
+                wp_die($error_message);
+            }
+        }
         
         // Validate list_id against the whitelist of lists saved in options.
         $allowed_lists = get_option('metahotels_brevo_lists', array());
@@ -1418,13 +1459,25 @@ function metahotels_brevo_subscribe_handler() {
             $debug_data['api_key_status'] = empty($api_key) ? 'NOT SET' : 'SET (length: ' . strlen($api_key) . ')';
         }
         
-        // Prepare contact data
+        // Prepare contact data.
+        //
+        // updateEnabled lets a guest who is already on the list submit again
+        // (e.g. with a new WhatsApp number) instead of hitting "contact already
+        // exists" mid-booking, so the journey is never blocked.
+        //
+        // emailBlacklisted / smsBlacklisted are deliberately NOT sent. Brevo
+        // leaves out-of-payload fields untouched, and this endpoint is
+        // unauthenticated: sending false would let anyone who knows an address
+        // silently undo that person's unsubscribe. Nothing here needs them —
+        // the post-booking cleanup DELETES the contact
+        // (metahotels_delete_brevo_user), it never blacklists, so a guest who
+        // booked and later signs up again is created fresh with no flag to
+        // reset. The only contacts carrying a blacklist flag are people who
+        // actually clicked unsubscribe, and that has to stick.
         $contact_data = array(
             'email' => $email,
             'listIds' => array($list_id),
             'updateEnabled' => true,
-            'emailBlacklisted' => false,
-            'smsBlacklisted' => false
         );
         
         // Add WhatsApp (now required)

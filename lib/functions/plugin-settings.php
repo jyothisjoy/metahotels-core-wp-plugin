@@ -70,6 +70,21 @@ function metahotels_core_register_settings() {
         'default' => false,
         'sanitize_callback' => 'metahotels_sanitize_boolean'
     ));
+
+    // Post permalink prefix. Off by default: enabling it changes the URL of
+    // every existing blog post, which is never something to do silently on
+    // update. Both options live in the same group as the tab that renders them
+    // (see the note above).
+    register_setting('metahotels_other_options', 'metahotels_enable_post_slug', array(
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'metahotels_sanitize_boolean'
+    ));
+    register_setting('metahotels_other_options', 'metahotels_post_slug', array(
+        'type' => 'string',
+        'default' => 'blog',
+        'sanitize_callback' => 'metahotels_sanitize_post_slug'
+    ));
 }
 add_action('admin_init', 'metahotels_core_register_settings');
 
@@ -112,6 +127,16 @@ add_action('update_option_metahotels_enable_careers', 'metahotels_core_schedule_
 add_action('update_option_metahotels_enable_destinations', 'metahotels_core_schedule_rewrite_flush', 10, 2);
 add_action('update_option_metahotels_enable_restaurants', 'metahotels_core_schedule_rewrite_flush', 10, 2);
 add_action('update_option_metahotels_enable_meetings', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+
+// Flush when the post permalink prefix changes. The add_option_* pair matters
+// here: the first save of an option that does not exist yet goes through
+// add_option(), which never fires update_option_*, and without a flush the new
+// prefix would 404 until permalinks were saved by hand.
+add_action('update_option_metahotels_enable_post_slug', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('update_option_metahotels_post_slug', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('add_option_metahotels_enable_post_slug', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+add_action('add_option_metahotels_post_slug', 'metahotels_core_schedule_rewrite_flush', 10, 2);
+
 add_action('shutdown', 'metahotels_core_maybe_flush_rewrite_rules', 999);
 
 // Settings page HTML
@@ -295,6 +320,63 @@ function metahotels_core_settings_page() {
                                            <?php checked($vbg_enabled, true); ?> />
                                     <span class="metahotels-slider"></span>
                                 </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metahotels-card">
+                        <div class="metahotels-card-header">
+                            <h3 class="metahotels-card-title"><?php esc_html_e('Post Permalinks', 'metahotels-core'); ?></h3>
+                            <p class="metahotels-card-description"><?php esc_html_e('Add a path in front of blog post URLs. Pages and the plugin post types (Hotels, Rooms, Offers and the rest) keep their own URLs.', 'metahotels-core'); ?></p>
+                        </div>
+                        <div class="metahotels-card-content">
+                            <?php
+                            $post_slug_enabled = (bool) get_option('metahotels_enable_post_slug', false);
+                            $post_slug         = metahotels_sanitize_post_slug(get_option('metahotels_post_slug', 'blog'));
+                            $pretty_permalinks = (bool) get_option('permalink_structure');
+                            ?>
+                            <div class="metahotels-switch-wrapper">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">
+                                        <span class="dashicons dashicons-admin-links" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
+                                        <?php esc_html_e('Add a Slug to Post URLs', 'metahotels-core'); ?>
+                                    </span>
+                                    <span class="metahotels-switch-desc"><?php esc_html_e('Applies to blog posts only. Existing post links keep working and redirect to the new URL.', 'metahotels-core'); ?></span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="hidden" name="metahotels_enable_post_slug" value="0" />
+                                    <input type="checkbox"
+                                           name="metahotels_enable_post_slug"
+                                           value="1"
+                                           <?php checked($post_slug_enabled, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="metahotels-form-group" style="margin-top: 1.5rem;">
+                                <label class="metahotels-label" for="metahotels_post_slug"><?php esc_html_e('Post Slug', 'metahotels-core'); ?></label>
+                                <input type="text"
+                                       id="metahotels_post_slug"
+                                       name="metahotels_post_slug"
+                                       value="<?php echo esc_attr($post_slug); ?>"
+                                       class="metahotels-input"
+                                       style="max-width: 260px;"
+                                       placeholder="blog" />
+                                <p class="metahotels-helper-text">
+                                    <?php esc_html_e('Defaults to "blog". Posts will be served from:', 'metahotels-core'); ?>
+                                    <code><?php echo esc_html(trailingslashit(home_url($post_slug)) . 'sample-post/'); ?></code>
+                                </p>
+                                <?php if (!$pretty_permalinks): ?>
+                                    <p class="metahotels-helper-text" style="color:#b32d2e;">
+                                        <?php
+                                        printf(
+                                            /* translators: %s: link to the Permalinks settings screen. */
+                                            esc_html__('This site uses plain permalinks, so the slug cannot be applied. Choose a pretty permalink structure under %s first.', 'metahotels-core'),
+                                            '<a href="' . esc_url(admin_url('options-permalink.php')) . '">' . esc_html__('Settings > Permalinks', 'metahotels-core') . '</a>'
+                                        );
+                                        ?>
+                                    </p>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

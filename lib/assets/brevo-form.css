@@ -126,6 +126,33 @@
     margin: 0;
 }
 
+/* Booking-confirmation checkbox */
+.brevo-form-container form.brevo-form .brevo-form-consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+}
+
+.brevo-form-container form.brevo-form .brevo-form-consent input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    margin: 2px 0 0;
+    flex-shrink: 0;
+    accent-color: var(--corporative-color, #0073aa);
+    cursor: pointer;
+}
+
+.brevo-form-container form.brevo-form .brevo-form-consent label {
+    font-size: 14px;
+    line-height: 1.45;
+    color: inherit;
+    cursor: pointer;
+    margin: 0;
+}
+
 /* Elementor Popup Specific Styles */
 .elementor-popup-modal .brevo-form-container {
     z-index: 999999;
