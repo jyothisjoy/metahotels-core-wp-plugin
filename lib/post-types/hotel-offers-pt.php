@@ -50,7 +50,7 @@ function metahotels_register_offers_post_type() {
         'description'           => __('Post Type Description', 'metahotels-core'),
         'labels'                => $labels,
         'supports'              => array('title', 'editor', 'excerpt', 'author', 'thumbnail', 'revisions', 'custom-fields'),
-        'taxonomies'            => array('offer_category'),
+        'taxonomies'            => array('offer_category', 'offer_tag'),
         'hierarchical'          => false,
         'public'                => true,
         'show_ui'               => true,
@@ -70,7 +70,7 @@ function metahotels_register_offers_post_type() {
 add_action('init', 'metahotels_register_offers_post_type', 1);
 
 /**
- * Register the 'offer_category' taxonomy for Offers.
+ * Register the 'offer_category' and 'offer_tag' taxonomies for Offers.
  */
 function metahotels_register_offer_taxonomy() {
     // Only register taxonomy if the offers post type is enabled
@@ -100,6 +100,32 @@ function metahotels_register_offer_taxonomy() {
         'rewrite'           => array('slug' => 'offer-category'),
     );
     register_taxonomy('offer_category', array('offer'), $args);
+
+    $labels = array(
+        'name'                       => _x('Offer Tags', 'taxonomy general name', 'metahotels-core'),
+        'singular_name'              => _x('Offer Tag', 'taxonomy singular name', 'metahotels-core'),
+        'search_items'               => __('Search Offer Tags', 'metahotels-core'),
+        'popular_items'              => __('Popular Offer Tags', 'metahotels-core'),
+        'all_items'                  => __('All Offer Tags', 'metahotels-core'),
+        'edit_item'                  => __('Edit Offer Tag', 'metahotels-core'),
+        'update_item'                => __('Update Offer Tag', 'metahotels-core'),
+        'add_new_item'               => __('Add New Offer Tag', 'metahotels-core'),
+        'new_item_name'              => __('New Offer Tag Name', 'metahotels-core'),
+        'separate_items_with_commas' => __('Separate offer tags with commas', 'metahotels-core'),
+        'add_or_remove_items'        => __('Add or remove offer tags', 'metahotels-core'),
+        'choose_from_most_used'      => __('Choose from the most used offer tags', 'metahotels-core'),
+        'not_found'                  => __('No offer tags found.', 'metahotels-core'),
+        'menu_name'                  => __('Offer Tags', 'metahotels-core'),
+    );
+    $args = array(
+        'hierarchical'      => false,
+        'labels'            => $labels,
+        'show_ui'           => true,
+        'show_admin_column' => true,
+        'query_var'         => true,
+        'rewrite'           => array('slug' => 'offer-tag'),
+    );
+    register_taxonomy('offer_tag', array('offer'), $args);
 }
 add_action('init', 'metahotels_register_offer_taxonomy', 0);
 
