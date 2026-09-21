@@ -126,3 +126,72 @@ function metahotels_post_slug_rewrite_rules($rules) {
     return array_merge($prefixed, $rules);
 }
 add_filter('post_rewrite_rules', 'metahotels_post_slug_rewrite_rules');
+
+/**
+ * 301 an un-prefixed post URL to its prefixed permalink.
+ *
+ * The un-prefixed rules kept above keep old links alive, but WordPress will not
+ * clean them up on its own: redirect_canonical() only rebuilds a permalink when
+ * the request arrived as a query string ($_GET['p'], $_GET['name'], ...). A URL
+ * that a rewrite rule matched is treated as authoritative, so /hello/ and
+ * /blog/hello/ would both answer 200 and split the post between two addresses.
+ *
+ * Prepending the prefix to the requested path — rather than redirecting to
+ * get_permalink() — keeps whatever trails the post: pagination (/2/), comment
+ * pages, and the query string all survive the redirect.
+ */
+function metahotels_post_slug_redirect_unprefixed() {
+    $prefix = metahotels_post_slug_prefix();
+
+    if ('' === $prefix || !is_singular('post')) {
+        return;
+    }
+
+    // Feeds, embeds, previews and trackbacks have their own URL shapes; leave
+    // them to WordPress.
+    if (is_feed() || is_embed() || is_preview() || is_trackback() || is_customize_preview()) {
+        return;
+    }
+
+    $request = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '';
+    $path    = (string) parse_url($request, PHP_URL_PATH);
+
+    if ('' === $path) {
+        return;
+    }
+
+    // Strip the install's own directory, if WordPress lives in a subfolder.
+    $home_path = (string) parse_url(home_url('/'), PHP_URL_PATH);
+    $home_path = '/' . ltrim(trailingslashit($home_path), '/');
+
+    if ('/' !== $home_path) {
+        if (0 !== strpos($path, $home_path)) {
+            return;
+        }
+        $path = substr($path, strlen($home_path) - 1);
+    }
+
+    $relative = ltrim($path, '/');
+
+    // Plain permalinks (/?p=123) leave nothing to prefix; redirect_canonical()
+    // already handles those.
+    if ('' === $relative) {
+        return;
+    }
+
+    // Already prefixed — nothing to do.
+    if (0 === strpos($relative, $prefix . '/')) {
+        return;
+    }
+
+    $target = home_url('/' . $prefix . '/' . $relative);
+
+    $query = (string) parse_url($request, PHP_URL_QUERY);
+    if ('' !== $query) {
+        $target .= '?' . $query;
+    }
+
+    wp_safe_redirect($target, 301);
+    exit;
+}
+add_action('template_redirect', 'metahotels_post_slug_redirect_unprefixed', 9);
