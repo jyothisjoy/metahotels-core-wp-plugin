@@ -71,6 +71,14 @@ function metahotels_core_register_settings() {
         'sanitize_callback' => 'metahotels_sanitize_boolean'
     ));
 
+    // Hero background image preload (LCP). Off by default; see
+    // lib/functions/hero-preload.php.
+    register_setting('metahotels_other_options', 'metahotels_enable_hero_preload', array(
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'metahotels_sanitize_boolean'
+    ));
+
     // Post permalink prefix. Off by default: enabling it changes the URL of
     // every existing blog post, which is never something to do silently on
     // update. Both options live in the same group as the tab that renders them
@@ -318,6 +326,25 @@ function metahotels_core_settings_page() {
                                            name="metahotels_enable_video_background"
                                            value="1"
                                            <?php checked($vbg_enabled, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+
+                            <?php $hero_preload_enabled = (bool) get_option('metahotels_enable_hero_preload', false); ?>
+                            <div class="metahotels-switch-wrapper" style="margin-top: 1.5rem;">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">
+                                        <span class="dashicons dashicons-format-image" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
+                                        <?php esc_html_e('Preload Hero Background Image', 'metahotels-core'); ?>
+                                    </span>
+                                    <span class="metahotels-switch-desc"><?php esc_html_e('Speeds up the first visible image on Elementor pages whose first section uses a background image or slideshow.', 'metahotels-core'); ?></span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="hidden" name="metahotels_enable_hero_preload" value="0" />
+                                    <input type="checkbox"
+                                           name="metahotels_enable_hero_preload"
+                                           value="1"
+                                           <?php checked($hero_preload_enabled, true); ?> />
                                     <span class="metahotels-slider"></span>
                                 </label>
                             </div>
