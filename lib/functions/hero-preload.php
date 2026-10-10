@@ -3,10 +3,11 @@
  * Preload hero background image (LCP) for Elementor pages.
  *
  * When the first top-level Section/Container of an Elementor page paints its
- * background from CSS (classic background image) or from JavaScript
- * (background slideshow), the browser cannot discover that image until the
- * stylesheet or the slideshow script has run, so the hero — usually the
- * Largest Contentful Paint element — starts downloading late. This prints a
+ * background from CSS (classic background image, or the fallback image of a
+ * background video) or from JavaScript (background slideshow), the browser
+ * cannot discover that image until the stylesheet or the slideshow script has
+ * run, so the hero — usually the Largest Contentful Paint element — starts
+ * downloading late. This prints a
  * <link rel="preload" as="image" fetchpriority="high"> for that image early in
  * <head> so it downloads straight away.
  *
@@ -18,6 +19,9 @@
  *  - Classic: Elementor's Media control resolves the CSS URL from the
  *    attachment ID with wp_get_attachment_image_url( id, size ?: 'full' ), and
  *    falls back to the stored `url` only when there is no ID.
+ *  - Video: the "Background Fallback" image is a Media control too, printed as
+ *    a CSS background on every device (the control is not responsive). It is
+ *    what the hero shows until the video plays, and instead of it on mobile.
  *
  * Off by default (MetaHotels Settings › Other Settings). Two filters let a
  * site override the switch or the image list:
@@ -230,7 +234,7 @@ function metahotels_hero_preload_collect(array $element, array $devices) {
     // Dynamic-tag backgrounds are only known after Elementor renders them.
     if (!empty($settings['__dynamic__']) && is_array($settings['__dynamic__'])) {
         foreach (array_keys($settings['__dynamic__']) as $key) {
-            if (0 === strpos($key, 'background_image') || 0 === strpos($key, 'background_slideshow_gallery')) {
+            if (0 === strpos($key, 'background_image') || 0 === strpos($key, 'background_slideshow_gallery') || 0 === strpos($key, 'background_video_fallback')) {
                 return array();
             }
         }
@@ -286,6 +290,15 @@ function metahotels_hero_preload_collect(array $element, array $devices) {
                 }
                 $device_urls[$name] = $inherited;
             }
+        }
+    } elseif ('video' === $type) {
+        // The fallback image is not responsive: one CSS background for every device.
+        $url = metahotels_hero_preload_media_url(isset($settings['background_video_fallback']) ? $settings['background_video_fallback'] : null);
+        if ('' === $url) {
+            return array();
+        }
+        foreach ($devices as $device) {
+            $device_urls[$device['name']] = $url;
         }
     } else {
         return array();

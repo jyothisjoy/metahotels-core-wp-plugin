@@ -337,7 +337,7 @@ function metahotels_core_settings_page() {
                                         <span class="dashicons dashicons-format-image" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
                                         <?php esc_html_e('Preload Hero Background Image', 'metahotels-core'); ?>
                                     </span>
-                                    <span class="metahotels-switch-desc"><?php esc_html_e('Speeds up the first visible image on Elementor pages whose first section uses a background image or slideshow.', 'metahotels-core'); ?></span>
+                                    <span class="metahotels-switch-desc"><?php esc_html_e('Speeds up the first visible image on Elementor pages whose first section uses a background image, slideshow or video with a fallback image.', 'metahotels-core'); ?></span>
                                 </div>
                                 <label class="metahotels-switch">
                                     <input type="hidden" name="metahotels_enable_hero_preload" value="0" />
