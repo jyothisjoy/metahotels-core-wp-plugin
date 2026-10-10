@@ -329,7 +329,9 @@ function metahotels_brevo_form_scripts() {
     
     // Load reCAPTCHA v3 site key
     $recaptcha_site_key = get_option('metahotels_brevo_recaptcha_site_key', '');
-    
+    // When enabled, the reCAPTCHA SDK is injected only once a form is visible or used.
+    $recaptcha_lazy = (bool) get_option('metahotels_brevo_recaptcha_lazy', false);
+
     // Prevent multiple executions
     static $script_loaded = false;
     if ($script_loaded) {
@@ -375,8 +377,12 @@ function metahotels_brevo_form_scripts() {
     
     // Output reCAPTCHA script and badge styling if configured
     if (!empty($recaptcha_site_key)) {
-        ?>
+        if (!$recaptcha_lazy) {
+            ?>
         <script src="https://www.google.com/recaptcha/api.js?render=<?php echo esc_attr($recaptcha_site_key); ?>"></script>
+            <?php
+        }
+        ?>
         <style>
             /* Move reCAPTCHA v3 badge inline under the Brevo form */
             .brevo-form-container .grecaptcha-badge {
@@ -409,8 +415,64 @@ function metahotels_brevo_form_scripts() {
         window.metahotelsBrevoInitialized = true;
         
         var recaptchaSiteKey = '<?php echo esc_js($recaptcha_site_key); ?>';
+        var recaptchaLazy = <?php echo $recaptcha_lazy ? 'true' : 'false'; ?>;
         var globalDebugMode = $('.brevo-form-container[data-debug-mode="1"]').length > 0;
         var initTimer = null;
+
+        // Load the reCAPTCHA SDK once and call back with true when it is ready
+        // (false if it is not configured or failed to load).
+        var recaptchaState = 'idle'; // idle | loading | ready | failed
+        var recaptchaCallbacks = [];
+
+        function ensureRecaptcha(callback) {
+            if (!recaptchaSiteKey) {
+                callback(false);
+                return;
+            }
+            if (typeof grecaptcha !== 'undefined' && grecaptcha.ready) {
+                grecaptcha.ready(function() { callback(true); });
+                return;
+            }
+            if (recaptchaState === 'failed' || !recaptchaLazy) {
+                callback(false);
+                return;
+            }
+            recaptchaCallbacks.push(callback);
+            if (recaptchaState === 'loading') {
+                return;
+            }
+            recaptchaState = 'loading';
+            var flush = function(ok) {
+                recaptchaState = ok ? 'ready' : 'failed';
+                var callbacks = recaptchaCallbacks;
+                recaptchaCallbacks = [];
+                callbacks.forEach(function(cb) { cb(ok); });
+            };
+            var script = document.createElement('script');
+            script.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(recaptchaSiteKey);
+            script.async = true;
+            script.onload = function() { grecaptcha.ready(function() { flush(true); }); };
+            script.onerror = function() { flush(false); };
+            document.head.appendChild(script);
+        }
+
+        // Lazy mode: start loading as soon as a form is visible (inline or in a popup) or touched.
+        function watchFormForRecaptcha(container) {
+            if (!recaptchaLazy || !recaptchaSiteKey || !container) {
+                return;
+            }
+            var preload = function() { ensureRecaptcha(function() {}); };
+            $(container).one('focusin pointerdown touchstart', preload);
+            if ('IntersectionObserver' in window) {
+                var observer = new IntersectionObserver(function(entries) {
+                    if (entries.some(function(entry) { return entry.isIntersecting; })) {
+                        observer.disconnect();
+                        preload();
+                    }
+                });
+                observer.observe(container);
+            }
+        }
 
         function scheduleInit(delay) {
             if (initTimer) {
@@ -616,7 +678,8 @@ function metahotels_brevo_form_scripts() {
                 var originalButtonText = $submitBtn.text();
                 formsFound++;
                 newFormsFound++;
-                
+                watchFormForRecaptcha($form.closest('.brevo-form-container')[0]);
+
                 // Auto-format country code field and restrict input
                 $form.find('input[name="country_code"]').on('input keypress', function(e) {
                     var value = $(this).val();
@@ -822,8 +885,9 @@ function metahotels_brevo_form_scripts() {
                         });
                     }
                     
-                    // If reCAPTCHA is configured and available, execute it before submitting
-                    if (recaptchaSiteKey && typeof grecaptcha !== 'undefined') {
+                    // If reCAPTCHA is configured, make sure it is loaded (lazy mode) and execute it before submitting
+                    ensureRecaptcha(function(recaptchaReady) {
+                    if (recaptchaReady) {
                         if (debugMode) {
                             console.log('Executing reCAPTCHA v3 for Brevo form...');
                         }
@@ -853,6 +917,7 @@ function metahotels_brevo_form_scripts() {
                         }
                         submitBrevoAjax();
                     }
+                    });
                 });
                 
                 $form.data('initialized', true);

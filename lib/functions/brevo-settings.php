@@ -168,6 +168,7 @@ function metahotels_brevo_render_content() {
     $recaptcha_site_key = get_option('metahotels_brevo_recaptcha_site_key', '');
     $recaptcha_secret_key = get_option('metahotels_brevo_recaptcha_secret_key', '');
     $recaptcha_required = (bool) get_option('metahotels_brevo_recaptcha_required', false);
+    $recaptcha_lazy = (bool) get_option('metahotels_brevo_recaptcha_lazy', false);
     $recaptcha_score_threshold = get_option('metahotels_brevo_recaptcha_score_threshold', 0.5);
     $lists = get_option('metahotels_brevo_lists', array());
     $default_country = get_option('metahotels_brevo_default_country', '+91');
@@ -203,6 +204,7 @@ function metahotels_brevo_render_content() {
 
         $new_debug_mode = isset($_POST['metahotels_brevo_debug_mode']) && wp_unslash($_POST['metahotels_brevo_debug_mode']) === '1';
         $new_recaptcha_required = isset($_POST['metahotels_brevo_recaptcha_required']) && wp_unslash($_POST['metahotels_brevo_recaptcha_required']) === '1';
+        $new_recaptcha_lazy = isset($_POST['metahotels_brevo_recaptcha_lazy']) && wp_unslash($_POST['metahotels_brevo_recaptcha_lazy']) === '1';
         $submitted_ipapi_api_key = isset($_POST['metahotels_ipapi_api_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_ipapi_api_key'])) : '';
         $new_ipapi_api_key = ('' !== $submitted_ipapi_api_key) ? $submitted_ipapi_api_key : $ipapi_api_key;
         $new_transactional_enabled = isset($_POST['metahotels_brevo_transactional_enabled']) && wp_unslash($_POST['metahotels_brevo_transactional_enabled']) === '1';
@@ -223,6 +225,7 @@ function metahotels_brevo_render_content() {
         update_option('metahotels_brevo_recaptcha_secret_key', $new_recaptcha_secret_key);
         update_option('metahotels_brevo_recaptcha_score_threshold', $new_recaptcha_score_threshold);
         update_option('metahotels_brevo_recaptcha_required', $new_recaptcha_required);
+        update_option('metahotels_brevo_recaptcha_lazy', $new_recaptcha_lazy);
 
         update_option('metahotels_brevo_debug_mode', $new_debug_mode);
 
@@ -231,6 +234,7 @@ function metahotels_brevo_render_content() {
         $recaptcha_site_key = $new_recaptcha_site_key;
         $recaptcha_secret_key = $new_recaptcha_secret_key;
         $recaptcha_required = $new_recaptcha_required;
+        $recaptcha_lazy = $new_recaptcha_lazy;
         $recaptcha_score_threshold = $new_recaptcha_score_threshold;
         $default_country = $new_default_country;
         $debug_mode = $new_debug_mode;
@@ -749,6 +753,19 @@ function metahotels_brevo_render_content() {
                                        name="metahotels_brevo_recaptcha_required"
                                        value="1"
                                        <?php checked($recaptcha_required, true); ?> />
+                                <span class="metahotels-slider"></span>
+                            </label>
+                        </div>
+                        <div class="metahotels-switch-wrapper" style="margin-top: 1.5rem;">
+                            <div class="metahotels-switch-label">
+                                <span class="metahotels-switch-title">Load reCAPTCHA only when a form is shown</span>
+                                <span class="metahotels-switch-desc">Instead of loading Google reCAPTCHA (~350 KB of JavaScript) on every page that contains a form, load it when the form scrolls into view, opens in a popup, or is first touched. Submissions always wait for reCAPTCHA, so verification is unchanged.</span>
+                            </div>
+                            <label class="metahotels-switch">
+                                <input type="checkbox"
+                                       name="metahotels_brevo_recaptcha_lazy"
+                                       value="1"
+                                       <?php checked($recaptcha_lazy, true); ?> />
                                 <span class="metahotels-slider"></span>
                             </label>
                         </div>
