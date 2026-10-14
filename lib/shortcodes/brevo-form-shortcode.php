@@ -331,6 +331,8 @@ function metahotels_brevo_form_scripts() {
     $recaptcha_site_key = get_option('metahotels_brevo_recaptcha_site_key', '');
     // When enabled, the reCAPTCHA SDK is injected only once a form is visible or used.
     $recaptcha_lazy = (bool) get_option('metahotels_brevo_recaptcha_lazy', false);
+    // When enabled, the IP country-code lookup (admin-ajax) waits until a form is visible or used.
+    $country_lazy = (bool) get_option('metahotels_brevo_country_lazy', false);
 
     // Prevent multiple executions
     static $script_loaded = false;
@@ -416,6 +418,7 @@ function metahotels_brevo_form_scripts() {
         
         var recaptchaSiteKey = '<?php echo esc_js($recaptcha_site_key); ?>';
         var recaptchaLazy = <?php echo $recaptcha_lazy ? 'true' : 'false'; ?>;
+        var countryLazy = <?php echo $country_lazy ? 'true' : 'false'; ?>;
         var globalDebugMode = $('.brevo-form-container[data-debug-mode="1"]').length > 0;
         var initTimer = null;
 
@@ -456,22 +459,35 @@ function metahotels_brevo_form_scripts() {
             document.head.appendChild(script);
         }
 
-        // Lazy mode: start loading as soon as a form is visible (inline or in a popup) or touched.
-        function watchFormForRecaptcha(container) {
-            if (!recaptchaLazy || !recaptchaSiteKey || !container) {
-                return;
-            }
-            var preload = function() { ensureRecaptcha(function() {}); };
-            $(container).one('focusin pointerdown touchstart', preload);
+        // Run callback once, as soon as the form is visible (inline or in a popup) or touched.
+        function whenFormShown(container, callback) {
+            var done = false;
+            var run = function() {
+                if (!done) {
+                    done = true;
+                    callback();
+                }
+            };
+            $(container).one('focusin pointerdown touchstart', run);
             if ('IntersectionObserver' in window) {
                 var observer = new IntersectionObserver(function(entries) {
                     if (entries.some(function(entry) { return entry.isIntersecting; })) {
                         observer.disconnect();
-                        preload();
+                        run();
                     }
                 });
                 observer.observe(container);
+            } else {
+                run();
             }
+        }
+
+        // Lazy mode: start loading reCAPTCHA as soon as a form is shown.
+        function watchFormForRecaptcha(container) {
+            if (!recaptchaLazy || !recaptchaSiteKey || !container) {
+                return;
+            }
+            whenFormShown(container, function() { ensureRecaptcha(function() {}); });
         }
 
         function scheduleInit(delay) {
@@ -714,8 +730,13 @@ function metahotels_brevo_form_scripts() {
                     }
                 });
                 
-                // Auto-fill country code using ipapi (if empty)
-                applyBrevoCountryCodeToForm($form);
+                // Auto-fill country code using ipapi (if empty); with countryLazy only once the form is shown
+                var formContainer = $form.closest('.brevo-form-container')[0];
+                if (countryLazy && formContainer) {
+                    whenFormShown(formContainer, function() { applyBrevoCountryCodeToForm($form); });
+                } else {
+                    applyBrevoCountryCodeToForm($form);
+                }
                 
                 $form.on('submit', function(e) {
                     e.preventDefault();

@@ -35,6 +35,8 @@ require_once plugin_dir_path(__FILE__) . 'lib/functions/post-slug.php';
 require_once plugin_dir_path(__FILE__) . 'lib/functions/room-elementor-tags.php';
 require_once plugin_dir_path(__FILE__) . 'lib/functions/vbg-elementor.php';
 require_once plugin_dir_path(__FILE__) . 'lib/functions/hero-preload.php';
+require_once plugin_dir_path(__FILE__) . 'lib/functions/popup-dialog-css.php';
+require_once plugin_dir_path(__FILE__) . 'lib/functions/entrance-first-paint.php';
 
 // Plugin Update Checker
 $puc_path = plugin_dir_path(__FILE__) . 'lib/plugin-update-checker/plugin-update-checker.php';

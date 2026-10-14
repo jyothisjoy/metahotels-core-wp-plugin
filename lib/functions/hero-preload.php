@@ -242,7 +242,21 @@ function metahotels_hero_preload_collect(array $element, array $devices) {
 
     $device_urls = array();
 
-    if ('slideshow' === $type) {
+    // Video Background (R2 / YouTube / Wistia) of this plugin: its poster covers
+    // the whole section on every device, whatever the section's own background.
+    $vbg_poster = '';
+    if (get_option('metahotels_enable_video_background', false)
+        && isset($settings['vbg_enable']) && 'yes' === $settings['vbg_enable']
+        && empty($settings['__dynamic__']['vbg_poster'])
+        && isset($settings['vbg_poster']['url']) && is_string($settings['vbg_poster']['url'])) {
+        $vbg_poster = trim($settings['vbg_poster']['url']);
+    }
+
+    if ('' !== $vbg_poster) {
+        foreach ($devices as $device) {
+            $device_urls[$device['name']] = $vbg_poster;
+        }
+    } elseif ('slideshow' === $type) {
         // Elementor's slideshow is not responsive and always starts at the
         // first gallery item, painted from the item's stored `url`.
         $gallery = isset($settings['background_slideshow_gallery']) ? $settings['background_slideshow_gallery'] : array();

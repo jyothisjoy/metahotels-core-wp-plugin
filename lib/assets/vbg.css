@@ -11,6 +11,15 @@
 	overflow: hidden;
 }
 
+/* "Start After Page Load": the poster, painted before the script has built the
+   layer. Same box and sizing as .vbg-layer__poster, which then covers it. */
+.elementor-element.has-vbg[style*="--vbg-poster"] {
+	background-image: var(--vbg-poster);
+	background-position: center center;
+	background-size: cover;
+	background-repeat: no-repeat;
+}
+
 /* The video layer: full-bleed, behind content, click-through. */
 .vbg-layer {
 	position: absolute;

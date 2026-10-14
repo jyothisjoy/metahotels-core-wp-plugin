@@ -207,6 +207,25 @@ function metahotels_vbg_register_controls($element, $section_id, $args) {
         )
     );
 
+    // Off by default: existing sections keep starting the file as soon as the
+    // section is in view.
+    $element->add_control(
+        'vbg_after_load',
+        array(
+            'label'        => esc_html__('Start After Page Load', 'metahotels-core'),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'label_on'     => esc_html__('Yes', 'metahotels-core'),
+            'label_off'    => esc_html__('No', 'metahotels-core'),
+            'return_value' => 'yes',
+            'default'      => '',
+            'description'  => esc_html__('Waits for the page to finish loading before the video file is requested, so it does not compete with the styles, scripts and fonts the first paint needs. The poster shows until then: set a Poster Image.', 'metahotels-core'),
+            'condition'    => array(
+                'vbg_enable' => 'yes',
+                'vbg_source' => 'file',
+            ),
+        )
+    );
+
     $element->add_control(
         'vbg_youtube',
         array(
@@ -557,6 +576,10 @@ function metahotels_vbg_build_config($element) {
     } else {
         $config['desktop'] = $desktop;
         $config['mobile']  = $mobile;
+        // Emitted only when switched on, so sections without it stay byte-identical.
+        if (isset($settings['vbg_after_load']) && 'yes' === $settings['vbg_after_load']) {
+            $config['afterLoad'] = true;
+        }
     }
 
     $config['poster']         = $poster;
@@ -599,6 +622,17 @@ function metahotels_vbg_before_render($element) {
             'data-vbg' => wp_json_encode($config),
         )
     );
+
+    // "Start After Page Load": the script builds the poster layer only once it
+    // runs, which is after the first paint. Hand the poster to the stylesheet as
+    // well, so the section shows it from the first paint (vbg.css).
+    if (!empty($config['afterLoad']) && !empty($config['poster'])) {
+        $element->add_render_attribute(
+            '_wrapper',
+            'style',
+            '--vbg-poster:url("' . str_replace('"', '%22', esc_url($config['poster'])) . '");'
+        );
+    }
 
     // Load the script only on pages that actually use the feature.
     if (!is_admin()) {

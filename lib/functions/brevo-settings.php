@@ -169,6 +169,7 @@ function metahotels_brevo_render_content() {
     $recaptcha_secret_key = get_option('metahotels_brevo_recaptcha_secret_key', '');
     $recaptcha_required = (bool) get_option('metahotels_brevo_recaptcha_required', false);
     $recaptcha_lazy = (bool) get_option('metahotels_brevo_recaptcha_lazy', false);
+    $country_lazy = (bool) get_option('metahotels_brevo_country_lazy', false);
     $recaptcha_score_threshold = get_option('metahotels_brevo_recaptcha_score_threshold', 0.5);
     $lists = get_option('metahotels_brevo_lists', array());
     $default_country = get_option('metahotels_brevo_default_country', '+91');
@@ -205,6 +206,7 @@ function metahotels_brevo_render_content() {
         $new_debug_mode = isset($_POST['metahotels_brevo_debug_mode']) && wp_unslash($_POST['metahotels_brevo_debug_mode']) === '1';
         $new_recaptcha_required = isset($_POST['metahotels_brevo_recaptcha_required']) && wp_unslash($_POST['metahotels_brevo_recaptcha_required']) === '1';
         $new_recaptcha_lazy = isset($_POST['metahotels_brevo_recaptcha_lazy']) && wp_unslash($_POST['metahotels_brevo_recaptcha_lazy']) === '1';
+        $new_country_lazy = isset($_POST['metahotels_brevo_country_lazy']) && wp_unslash($_POST['metahotels_brevo_country_lazy']) === '1';
         $submitted_ipapi_api_key = isset($_POST['metahotels_ipapi_api_key']) ? sanitize_text_field(wp_unslash($_POST['metahotels_ipapi_api_key'])) : '';
         $new_ipapi_api_key = ('' !== $submitted_ipapi_api_key) ? $submitted_ipapi_api_key : $ipapi_api_key;
         $new_transactional_enabled = isset($_POST['metahotels_brevo_transactional_enabled']) && wp_unslash($_POST['metahotels_brevo_transactional_enabled']) === '1';
@@ -226,6 +228,7 @@ function metahotels_brevo_render_content() {
         update_option('metahotels_brevo_recaptcha_score_threshold', $new_recaptcha_score_threshold);
         update_option('metahotels_brevo_recaptcha_required', $new_recaptcha_required);
         update_option('metahotels_brevo_recaptcha_lazy', $new_recaptcha_lazy);
+        update_option('metahotels_brevo_country_lazy', $new_country_lazy);
 
         update_option('metahotels_brevo_debug_mode', $new_debug_mode);
 
@@ -235,6 +238,7 @@ function metahotels_brevo_render_content() {
         $recaptcha_secret_key = $new_recaptcha_secret_key;
         $recaptcha_required = $new_recaptcha_required;
         $recaptcha_lazy = $new_recaptcha_lazy;
+        $country_lazy = $new_country_lazy;
         $recaptcha_score_threshold = $new_recaptcha_score_threshold;
         $default_country = $new_default_country;
         $debug_mode = $new_debug_mode;
@@ -789,6 +793,20 @@ function metahotels_brevo_render_content() {
                                    style="max-width: 200px;"
                                    required />
                             <p class="metahotels-helper-text">E.g., +1 for USA, +91 for India.</p>
+                        </div>
+
+                        <div class="metahotels-switch-wrapper" style="margin-top: 1.5rem;">
+                            <div class="metahotels-switch-label">
+                                <span class="metahotels-switch-title">Look up the visitor's country code only when a form is shown</span>
+                                <span class="metahotels-switch-desc">The phone field is pre-filled from the visitor's IP address through a request to this site (admin-ajax), which is never cached. Instead of sending it on every page view that contains a form (including a popup that has not opened), send it when the form scrolls into view, opens in a popup, or is first touched. The default code above stays in the field until then.</span>
+                            </div>
+                            <label class="metahotels-switch">
+                                <input type="checkbox"
+                                       name="metahotels_brevo_country_lazy"
+                                       value="1"
+                                       <?php checked($country_lazy, true); ?> />
+                                <span class="metahotels-slider"></span>
+                            </label>
                         </div>
 
                         <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">

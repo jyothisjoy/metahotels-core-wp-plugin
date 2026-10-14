@@ -79,6 +79,22 @@ function metahotels_core_register_settings() {
         'sanitize_callback' => 'metahotels_sanitize_boolean'
     ));
 
+    // Elementor popup dialog stylesheet printed with the page. Off by default;
+    // see lib/functions/popup-dialog-css.php.
+    register_setting('metahotels_other_options', 'metahotels_enable_popup_dialog_css', array(
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'metahotels_sanitize_boolean'
+    ));
+
+    // Entrance animations of the header and the first section start at first
+    // paint. Off by default; see lib/functions/entrance-first-paint.php.
+    register_setting('metahotels_other_options', 'metahotels_enable_entrance_first_paint', array(
+        'type' => 'boolean',
+        'default' => false,
+        'sanitize_callback' => 'metahotels_sanitize_boolean'
+    ));
+
     // Post permalink prefix. Off by default: enabling it changes the URL of
     // every existing blog post, which is never something to do silently on
     // update. Both options live in the same group as the tab that renders them
@@ -345,6 +361,44 @@ function metahotels_core_settings_page() {
                                            name="metahotels_enable_hero_preload"
                                            value="1"
                                            <?php checked($hero_preload_enabled, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+
+                            <?php $popup_dialog_css_enabled = (bool) get_option('metahotels_enable_popup_dialog_css', false); ?>
+                            <div class="metahotels-switch-wrapper" style="margin-top: 1.5rem;">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">
+                                        <span class="dashicons dashicons-align-center" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
+                                        <?php esc_html_e('Load Popup Styles With the Page', 'metahotels-core'); ?>
+                                    </span>
+                                    <span class="metahotels-switch-desc"><?php esc_html_e('Stops an Elementor popup that opens on a timer, on scroll or on exit intent from shifting the page layout or scrolling the page to the bottom when it opens. Adds one small stylesheet (about 1.4 KB) to every page.', 'metahotels-core'); ?></span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="hidden" name="metahotels_enable_popup_dialog_css" value="0" />
+                                    <input type="checkbox"
+                                           name="metahotels_enable_popup_dialog_css"
+                                           value="1"
+                                           <?php checked($popup_dialog_css_enabled, true); ?> />
+                                    <span class="metahotels-slider"></span>
+                                </label>
+                            </div>
+
+                            <?php $entrance_first_paint_enabled = (bool) get_option('metahotels_enable_entrance_first_paint', false); ?>
+                            <div class="metahotels-switch-wrapper" style="margin-top: 1.5rem;">
+                                <div class="metahotels-switch-label">
+                                    <span class="metahotels-switch-title">
+                                        <span class="dashicons dashicons-controls-play" style="font-size: 1.25rem; width: 1.25rem; height: 1.25rem; vertical-align: middle; margin-right: 0.5rem; color: #64748b;"></span>
+                                        <?php esc_html_e('Start Header and Hero Animations at First Paint', 'metahotels-core'); ?>
+                                    </span>
+                                    <span class="metahotels-switch-desc"><?php esc_html_e('Elementor keeps elements with an entrance animation hidden until its scripts have loaded, so an animated header or hero heading can be missing for seconds on a phone. This plays the same animation as soon as the page paints, for the header and the first section only.', 'metahotels-core'); ?></span>
+                                </div>
+                                <label class="metahotels-switch">
+                                    <input type="hidden" name="metahotels_enable_entrance_first_paint" value="0" />
+                                    <input type="checkbox"
+                                           name="metahotels_enable_entrance_first_paint"
+                                           value="1"
+                                           <?php checked($entrance_first_paint_enabled, true); ?> />
                                     <span class="metahotels-slider"></span>
                                 </label>
                             </div>
